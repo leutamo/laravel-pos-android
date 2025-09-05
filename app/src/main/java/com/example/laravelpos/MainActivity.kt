@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.laravelpos.ui.theme.cart.CartScreen
 import com.example.laravelpos.ui.theme.home.HomeScreen
 import com.example.laravelpos.ui.theme.login.LoginScreen
+import com.example.laravelpos.viewmodel.HomeViewModel
 import com.example.laravelpos.viewmodel.LoginViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -32,6 +33,7 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation() {
     val navController = rememberNavController()
     val viewModel: LoginViewModel = hiltViewModel()
+    val homeViewModel: HomeViewModel = hiltViewModel() // Única instancia creada aquí
     val startDestination = if (viewModel.isLoggedIn()) "home" else "login"
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -39,10 +41,10 @@ fun AppNavigation() {
             LoginScreen(navController)
         }
         composable("home") {
-            HomeScreen(navController)
+            HomeScreen(navController, homeViewModel)
         }
         composable("cart") {
-            CartScreen(navController)
+            CartScreen(navController, homeViewModel)
         }
     }
 }

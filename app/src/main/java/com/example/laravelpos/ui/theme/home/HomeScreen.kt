@@ -54,9 +54,9 @@ import com.example.laravelpos.viewmodel.LoginViewModel
 private const val TAG = "HomeScreen"
 
 @Composable
-fun HomeScreen(navController: NavController) {
+fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
     val viewModel: LoginViewModel = hiltViewModel()
-    val homeViewModel: HomeViewModel = hiltViewModel()
+    //val homeViewModel: HomeViewModel = hiltViewModel()
     val userName by viewModel.userName.collectAsState()
     val filteredProducts by homeViewModel.filteredProducts.collectAsState()
 
