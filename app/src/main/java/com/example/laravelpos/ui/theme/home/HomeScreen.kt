@@ -60,6 +60,10 @@ fun HomeScreen(navController: NavController) {
     val userName by viewModel.userName.collectAsState()
     val filteredProducts by homeViewModel.filteredProducts.collectAsState()
 
+    // Para actualizar el contador de carrito
+    val cartItems by homeViewModel.cartItems.collectAsState()
+    val cartItemCount = cartItems.size
+
     val isAuthenticated by viewModel.isAuthenticated.collectAsState()
 
     var searchText by remember { mutableStateOf(TextFieldValue("")) }
@@ -122,7 +126,7 @@ fun HomeScreen(navController: NavController) {
                         .align(Alignment.TopEnd)
                 ) {
                     Text(
-                        text = "0", // Placeholder for cart count
+                        text = cartItemCount.toString(), // Placeholder for cart count, se agrega contador de cartItem
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.align(Alignment.Center)
@@ -148,7 +152,8 @@ fun HomeScreen(navController: NavController) {
                         .fillMaxWidth()
                         .clickable {
                             Log.d(TAG, "Card clicked for: ${product.attributes.name}")
-                            Toast.makeText(context, "Card clicked for: ${product.attributes.name}", Toast.LENGTH_SHORT).show()
+                            homeViewModel.addItemToCart(product)
+                            Toast.makeText(context, "Producto Agregado: ${product.attributes.name}", Toast.LENGTH_SHORT).show()
                         },
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
