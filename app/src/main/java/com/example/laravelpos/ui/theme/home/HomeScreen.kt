@@ -109,7 +109,9 @@ fun HomeScreen(navController: NavController) {
                     .size(48.dp)
                     .padding(start = 8.dp)
                     .clickable {
-                        // TODO: Navigate to cart view
+                        navController.navigate("cart") { // <-- Navega a "cart"
+                            // popUpTo("home") { inclusive = true } // Se comenta para no eliminar el stack
+                        }
                     },
                 contentAlignment = Alignment.Center
             ) {

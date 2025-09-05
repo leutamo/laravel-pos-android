@@ -10,6 +10,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.laravelpos.ui.theme.cart.CartScreen
 import com.example.laravelpos.ui.theme.home.HomeScreen
 import com.example.laravelpos.ui.theme.login.LoginScreen
 import com.example.laravelpos.viewmodel.LoginViewModel
@@ -39,6 +40,9 @@ fun AppNavigation() {
         }
         composable("home") {
             HomeScreen(navController)
+        }
+        composable("cart") {
+            CartScreen(navController)
         }
     }
 }
