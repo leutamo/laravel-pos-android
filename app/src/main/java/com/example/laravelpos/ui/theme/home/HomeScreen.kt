@@ -20,9 +20,12 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -78,18 +81,57 @@ fun HomeScreen(navController: NavController) {
     Column(modifier = Modifier
         .fillMaxSize()
         .padding(WindowInsets.systemBars.asPaddingValues())) {
-        // Search bar
-        OutlinedTextField(
-            value = searchText,
-            onValueChange = {
-                searchText = it
-                homeViewModel.onSearchQueryChanged(it.text)
-            },
-            label = { Text("Buscar producto...") },
+        // Search bar and cart Icon
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
-        )
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = searchText,
+                onValueChange = {
+                    searchText = it
+                    homeViewModel.onSearchQueryChanged(it.text)
+                },
+                label = { Text("Buscar producto...") },
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(8.dp)
+            )
+            // Shopping cart icon and counter
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .padding(start = 8.dp)
+                    .clickable {
+                        // TODO: Navigate to cart view
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ShoppingCart,
+                    contentDescription = "Carrito de compras",
+                    modifier = Modifier.size(28.dp)
+                )
+                // Counter overlay
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(Color.Red, shape = MaterialTheme.shapes.small)
+                        .align(Alignment.TopEnd)
+                ) {
+                    Text(
+                        text = "0", // Placeholder for cart count
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Product grid with 2 columns
         LazyVerticalGrid(
@@ -218,6 +260,7 @@ fun PreviewHomeScreen() {
     // as it doesn't have access to the ViewModel or NavController
     // This is a simplified example to show the layout
     Column(modifier = Modifier.fillMaxSize()) {
+
         OutlinedTextField(
             value = "Buscar producto...",
             onValueChange = {},
