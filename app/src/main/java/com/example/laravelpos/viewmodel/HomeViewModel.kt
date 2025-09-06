@@ -1,5 +1,6 @@
 package com.example.laravelpos.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.Product
@@ -15,6 +16,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlinx.coroutines.flow.map
+
+private const val TAG = "HomeViewModel"
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -45,12 +48,15 @@ class HomeViewModel @Inject constructor(
         )
 
     init {
+        Log.d(TAG, "ViewModel initialized, starting fetchProducts")
         fetchProducts()
     }
 
-    private fun fetchProducts() {
+    fun fetchProducts() {
         viewModelScope.launch {
+            Log.d(TAG, "fetchProducts: Fetching products from repository...")
             val productList = repository.getProducts()
+            Log.d(TAG, "Server responded with ${productList.size} products")
             _products.value = productList
         }
     }
