@@ -12,13 +12,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,17 +38,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.laravelpos.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
     val totalAmount by homeViewModel.totalAmount.collectAsState()
-    val igvAmount by homeViewModel.igvAmount.collectAsState()
     val selectedReceiptType by homeViewModel.selectedReceiptType.collectAsState()
 
     var dniText by remember { mutableStateOf("") }
@@ -56,6 +53,10 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
     var pagoVisa by remember { mutableStateOf("0.00") }
     var totalRecibido by remember { mutableStateOf("0.00") }
     var pagoContado by remember { mutableStateOf(true) }
+
+    val documentTypes = listOf("DNI", "RUC", "Carnet de extranjería", "Pasaporte")
+    var expanded by remember { mutableStateOf(false) }
+    var selectedDocumentType by remember { mutableStateOf(documentTypes[0]) }
 
     Scaffold(
         topBar = {
@@ -118,24 +119,65 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 )
             }
 
-            // DNI y botón Genérico
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            // Selector de tipo de documento y DNI
+            Column(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = dniText,
-                    onValueChange = { dniText = it },
-                    label = { Text("DNI") },
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { /* TODO: Lógica para DNI genérico */ }) {
-                    Text("Genérico")
+                // Dropdown para seleccionar el tipo de documento
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth() // <-- El cambio principal: ahora ocupa todo el ancho
+                ) {
+                    OutlinedTextField(
+                        readOnly = true,
+                        value = selectedDocumentType,
+                        onValueChange = { },
+                        label = { Text("Tipo") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(
+                                expanded = expanded
+                            )
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        documentTypes.forEach { selectionOption ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(selectionOption) },
+                                onClick = {
+                                    selectedDocumentType = selectionOption
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp)) // <-- Espacio entre el selector y el campo de texto
+
+                // Campo de texto para el número de documento
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = dniText,
+                        onValueChange = { dniText = it },
+                        label = { Text(selectedDocumentType) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = { /* TODO: Lógica para DNI genérico */ }) {
+                        Text("Genérico")
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-
             // Radio buttons para Contado y Crédito
             Row(
                 modifier = Modifier.fillMaxWidth(),
