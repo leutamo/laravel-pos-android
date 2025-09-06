@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.Product
 import com.example.laravelpos.data.repository.ProductRepository
+import com.example.laravelpos.data.repository.QuotationRepository
+import com.example.laravelpos.data.repository.QuotationRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,9 +21,12 @@ import kotlinx.coroutines.flow.map
 
 private const val TAG = "HomeViewModel"
 
+
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: ProductRepository
+    private val repository: ProductRepository,
+    private val quotationRepository: QuotationRepository
 ) : ViewModel() {
     private val _products = MutableStateFlow<List<Product>>(emptyList())
     val products: StateFlow<List<Product>> = _products.asStateFlow()
@@ -43,6 +48,14 @@ class HomeViewModel @Inject constructor(
 
     private val _showReceiptModal = MutableStateFlow(false)
     val showReceiptModal: StateFlow<Boolean> = _showReceiptModal.asStateFlow()
+
+    // Estados para la llamada a la API
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _apiError = MutableStateFlow<String?>(null)
+    val apiError: StateFlow<String?> = _apiError.asStateFlow()
+
 
     val filteredProducts: StateFlow<List<Product>>
         get() = combine(_products, _searchQuery) { products, query ->
@@ -170,5 +183,31 @@ class HomeViewModel @Inject constructor(
     fun selectReceiptType(type: String?) {
         _selectedReceiptType.value = type
         hideReceiptModal()
+    }
+
+    // Nueva función para borrar el error
+    fun clearApiError() {
+        _apiError.value = null
+    }
+
+    // Nueva función para procesar el pago y hacer la llamada a la API
+    fun processCheckout() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _apiError.value = null // Limpiar errores anteriores
+            try {
+                // TODO: Reemplazar por los datos reales del carrito
+                val requestBody = QuotationRequest(exampleData = "Datos de prueba")
+                val response = quotationRepository.createQuotation(requestBody)
+
+                // Manejar la respuesta exitosa
+                Log.d(TAG, "Respuesta de la API: ${response.message}")
+                _isLoading.value = false
+            } catch (e: Exception) {
+                _isLoading.value = false
+                _apiError.value = "Error: ${e.message}"
+                Log.e(TAG, "Error en la petición: ${e.message}", e)
+            }
+        }
     }
 }

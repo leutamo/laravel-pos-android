@@ -1,5 +1,6 @@
 package com.example.laravelpos.ui.theme.checkout
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +59,32 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
     val documentTypes = listOf("DNI", "RUC", "Carnet de extranjería", "Pasaporte")
     var expanded by remember { mutableStateOf(false) }
     var selectedDocumentType by remember { mutableStateOf(documentTypes[0]) }
+
+    val apiError by homeViewModel.apiError.collectAsState()
+
+    if (apiError != null) {
+        AlertDialog(
+            onDismissRequest = {
+                // Cierra el diálogo cuando el usuario hace clic fuera de él
+                homeViewModel.clearApiError()
+            },
+            title = {
+                Text(text = "Error del Servidor", color = Color.Red)
+            },
+            text = {
+                Text(text = apiError!!)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        homeViewModel.clearApiError()
+                    }
+                ) {
+                    Text("Aceptar")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -268,8 +296,8 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 Spacer(modifier = Modifier.width(16.dp))
                 Button(
                     onClick = {
-                        // Esta línea navega a la pantalla de resumen
-                        navController.navigate("summary")
+                        Log.d("CheckoutScreen", "Botón Cobrar presionado") // Log para verificar el clic
+                        homeViewModel.processCheckout()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
                     modifier = Modifier.weight(1f)
