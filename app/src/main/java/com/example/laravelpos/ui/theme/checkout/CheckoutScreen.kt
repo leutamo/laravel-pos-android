@@ -267,7 +267,10 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Button(
-                    onClick = { /* TODO: Lógica de cobro */ },
+                    onClick = {
+                        // Esta línea navega a la pantalla de resumen
+                        navController.navigate("summary")
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
                     modifier = Modifier.weight(1f)
                 ) {

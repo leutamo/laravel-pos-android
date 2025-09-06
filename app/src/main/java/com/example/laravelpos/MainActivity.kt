@@ -14,6 +14,7 @@ import com.example.laravelpos.ui.theme.cart.CartScreen
 import com.example.laravelpos.ui.theme.checkout.CheckoutScreen
 import com.example.laravelpos.ui.theme.home.HomeScreen
 import com.example.laravelpos.ui.theme.login.LoginScreen
+import com.example.laravelpos.ui.theme.summary.SummaryScreen
 import com.example.laravelpos.viewmodel.HomeViewModel
 import com.example.laravelpos.viewmodel.LoginViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -49,6 +50,10 @@ fun AppNavigation() {
         }
         composable("checkout") { backStackEntry ->
             CheckoutScreen(navController, homeViewModel)
+        }
+        // Nueva ruta para la pantalla de resumen
+        composable("summary") { backStackEntry ->
+            SummaryScreen(navController, homeViewModel)
         }
     }
 }
