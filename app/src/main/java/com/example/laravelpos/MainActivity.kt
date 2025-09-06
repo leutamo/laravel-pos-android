@@ -7,9 +7,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.laravelpos.ui.theme.cart.CartScreen
 import com.example.laravelpos.ui.theme.checkout.CheckoutScreen
 import com.example.laravelpos.ui.theme.home.HomeScreen
@@ -51,9 +53,18 @@ fun AppNavigation() {
         composable("checkout") { backStackEntry ->
             CheckoutScreen(navController, homeViewModel)
         }
+        /*
         // Nueva ruta para la pantalla de resumen
         composable("summary") { backStackEntry ->
             SummaryScreen(navController, homeViewModel)
+        }
+*/
+        composable(
+            "summary_screen/{quotationId}",
+            arguments = listOf(navArgument("quotationId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val quotationId = backStackEntry.arguments?.getInt("quotationId") ?: 0
+            SummaryScreen(navController = navController, homeViewModel, quotationId = quotationId)
         }
     }
 }

@@ -46,7 +46,7 @@ import com.example.laravelpos.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SummaryScreen(navController: NavController, homeViewModel: HomeViewModel) {
+fun SummaryScreen(navController: NavController, homeViewModel: HomeViewModel, quotationId: Int) {
     val cartItems by homeViewModel.cartItems.collectAsState()
     val totalAmount by homeViewModel.totalAmount.collectAsState()
     val igvAmount by homeViewModel.igvAmount.collectAsState()
@@ -69,7 +69,7 @@ fun SummaryScreen(navController: NavController, homeViewModel: HomeViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = selectedReceiptType ?: "Resumen de Compra",
+                            text = "${selectedReceiptType ?: "Resumen de Compra"} #$quotationId",
                             color = Color.White,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )

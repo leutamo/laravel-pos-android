@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.laravelpos.viewmodel.HomeViewModel
 
@@ -64,6 +66,15 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
     val isLoading by homeViewModel.isLoading.collectAsState()
 
     val apiError by homeViewModel.apiError.collectAsState()
+
+    val navigateToSummary by homeViewModel.navigateToSummary.collectAsStateWithLifecycle()
+
+    LaunchedEffect(navigateToSummary) {
+        navigateToSummary?.let { id ->
+            navController.navigate("summary_screen/$id")
+            homeViewModel.onSummaryNavigated()
+        }
+    }
 
     if (apiError != null) {
         AlertDialog(

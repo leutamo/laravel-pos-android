@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.Product
 import com.example.laravelpos.data.repository.ProductRepository
+import com.example.laravelpos.data.repository.QuotationItem
 import com.example.laravelpos.data.repository.QuotationRepository
 import com.example.laravelpos.data.repository.QuotationRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,10 +19,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlinx.coroutines.flow.map
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private const val TAG = "HomeViewModel"
-
-
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -37,6 +39,10 @@ class HomeViewModel @Inject constructor(
     // Estado para los ítems del carrito
     private val _cartItems = MutableStateFlow<List<Product>>(emptyList())
     val cartItems: StateFlow<List<Product>> = _cartItems.asStateFlow() // Exponemos como StateFlow
+
+    // PAra completar la navegacion
+    private val _navigateToSummary = MutableStateFlow<Int?>(null)
+    val navigateToSummary: StateFlow<Int?> = _navigateToSummary.asStateFlow()
 
     // Mapa para almacenar la cantidad de cada producto en el carrito
     private val _itemQuantities = MutableStateFlow<Map<String, Int>>(emptyMap())
@@ -146,7 +152,8 @@ class HomeViewModel @Inject constructor(
         cartItems, _itemQuantities
     ) { items, quantities ->
         items.sumOf { item ->
-            val productIdAsString = item.id.toString() // Convertimos el ID a String para buscar en el mapa
+            val productIdAsString =
+                item.id.toString() // Convertimos el ID a String para buscar en el mapa
             val count = quantities[productIdAsString] ?: 0
             item.attributes.product_price * count
         }
@@ -190,24 +197,79 @@ class HomeViewModel @Inject constructor(
         _apiError.value = null
     }
 
+
     // Nueva función para procesar el pago y hacer la llamada a la API
     fun processCheckout() {
         viewModelScope.launch {
             _isLoading.value = true
             _apiError.value = null // Limpiar errores anteriores
             try {
-                // TODO: Reemplazar por los datos reales del carrito
-                val requestBody = QuotationRequest(exampleData = "Datos de prueba")
+                // Obtener los datos del carrito
+                val items = _cartItems.value
+                val quantities = _itemQuantities.value
+
+                // Construir la lista de items para la petición
+                val quotationItems = items.map { product ->
+                    val quantity = quantities[product.id.toString()] ?: 0
+                    val subTotal = product.attributes.product_price * quantity
+                    QuotationItem(
+                        productId = product.id.toString(),
+                        quantity = quantity,
+                        netUnitPrice = product.attributes.product_price,
+                        taxType = 2,
+                        taxValue = 0.0,
+                        taxAmount = 0.0,
+                        discountType = 2,
+                        discountValue = 0.0,
+                        discountAmount = 0.0,
+                        saleUnit = 1,
+                        subTotal = subTotal,
+                        productPrice = product.attributes.product_price,
+                    )
+                }
+
+                // Obtener la fecha actual en el formato YYYY-MM-DD
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val currentDate = dateFormat.format(Date())
+
+                // Construir el cuerpo de la petición
+                val requestBody = QuotationRequest(
+                    date = currentDate,
+                    customerId = 1, //TODO: CAmbiar a un id de cliente correcto
+                    quotationItems = quotationItems,
+                    warehouseId = 1, // TODO: Cambiar con el almacen desde el server,
+                    status = "Pendiente", // TODO: Verificar el status
+                    // Agregamos los campos que faltan con valores de prueba
+                    taxRate = 0.0,
+                    taxAmount = 0.0,
+                    discount = 0.0,
+                    shipping = 0.0,
+                    grandTotal = 0.0,
+                    receivedAmount = 0.0,
+                    paidAmount = 0.0,
+                )
+
+                // Realizar la llamada a la API
                 val response = quotationRepository.createQuotation(requestBody)
 
-                // Manejar la respuesta exitosa
-                Log.d(TAG, "Respuesta de la API: ${response.message}")
-                _isLoading.value = false
+                // Manejar la respuesta
+                if (response.success) {
+                    Log.d(TAG, "Respuesta de la API exitosa: La cotización fue creada con el ID: ${response.data?.id}")
+                    _navigateToSummary.value = response.data?.id
+                } else {
+                    _apiError.value = response.message
+                    Log.e(TAG, "Error de la API: ${response.message}")
+                }
             } catch (e: Exception) {
-                _isLoading.value = false
-                _apiError.value = "Error: ${e.message}"
+                _apiError.value = e.message
                 Log.e(TAG, "Error en la petición: ${e.message}", e)
+            } finally {
+                _isLoading.value = false
             }
         }
+    }
+
+    fun onSummaryNavigated() {
+        _navigateToSummary.value = null
     }
 }
