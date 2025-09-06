@@ -27,10 +27,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -56,6 +59,9 @@ fun CartScreen(
     val cartItems by homeViewModel.cartItems.collectAsState()
     val totalAmount by homeViewModel.totalAmount.collectAsState()
     val igvAmount by homeViewModel.igvAmount.collectAsState()
+    // Modal values
+    val selectedReceiptType by homeViewModel.selectedReceiptType.collectAsState()
+    val showReceiptModal by homeViewModel.showReceiptModal.collectAsState()
     // --- LÍNEA DE DEPURACIÓN AÑADIDA ---
     Toast.makeText(context, "CartScreen: cartItems size is ${cartItems.size}", Toast.LENGTH_SHORT).show()
     // ---------------------------------
@@ -138,11 +144,71 @@ fun CartScreen(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Button(
-                    onClick = { /* TODO: Implementar lógica de siguiente */ },
+                    onClick = { homeViewModel.showReceiptModal() },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(text = "Siguiente", color = Color.White)
+                }
+            }
+        }
+
+        // Modal para seleccionar el tipo de comprobante
+        if (showReceiptModal) {
+            ModalBottomSheet(
+                onDismissRequest = { homeViewModel.hideReceiptModal() },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Selecciona tipo de comprobante",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Button(
+                        onClick = { homeViewModel.selectReceiptType("Nota de Venta") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Nota de Venta")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { homeViewModel.selectReceiptType("Boleta de Venta") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Boleta de Venta")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { homeViewModel.selectReceiptType("Factura") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Factura")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { homeViewModel.hideReceiptModal() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.error, MaterialTheme.shapes.medium),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Cancelar", color = MaterialTheme.colorScheme.onError)
+                    }
+                }
+            }
+        }
+
+        // Navegación a Checkout tras seleccionar (evitar bucles)
+        LaunchedEffect(selectedReceiptType) {
+            if (selectedReceiptType != null && navController.currentBackStackEntry?.destination?.route != "checkout") {
+                navController.navigate("checkout") {
+                    launchSingleTop = true
+                    popUpTo("cart") { inclusive = false }
                 }
             }
         }

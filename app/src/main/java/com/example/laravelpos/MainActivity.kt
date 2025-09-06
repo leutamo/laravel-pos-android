@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.laravelpos.ui.theme.cart.CartScreen
+import com.example.laravelpos.ui.theme.checkout.CheckoutScreen
 import com.example.laravelpos.ui.theme.home.HomeScreen
 import com.example.laravelpos.ui.theme.login.LoginScreen
 import com.example.laravelpos.viewmodel.HomeViewModel
@@ -45,6 +46,9 @@ fun AppNavigation() {
         }
         composable("cart") {
             CartScreen(navController, homeViewModel)
+        }
+        composable("checkout") { backStackEntry ->
+            CheckoutScreen(navController, homeViewModel)
         }
     }
 }

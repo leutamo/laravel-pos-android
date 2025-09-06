@@ -37,6 +37,13 @@ class HomeViewModel @Inject constructor(
     private val _itemQuantities = MutableStateFlow<Map<String, Int>>(emptyMap())
     val itemQuantities: StateFlow<Map<String, Int>> = _itemQuantities.asStateFlow()
 
+    // Para el modal de tipo de comprobante
+    private val _selectedReceiptType = MutableStateFlow<String?>(null)
+    val selectedReceiptType: StateFlow<String?> = _selectedReceiptType.asStateFlow()
+
+    private val _showReceiptModal = MutableStateFlow(false)
+    val showReceiptModal: StateFlow<Boolean> = _showReceiptModal.asStateFlow()
+
     val filteredProducts: StateFlow<List<Product>>
         get() = combine(_products, _searchQuery) { products, query ->
             if (query.isBlank()) products
@@ -147,5 +154,21 @@ class HomeViewModel @Inject constructor(
     fun clearCart() {
         _cartItems.value = emptyList()
         _itemQuantities.value = emptyMap()
+    }
+
+    /**
+     * Modal Tipo de comprobante
+     */
+    fun showReceiptModal() {
+        _showReceiptModal.value = true
+    }
+
+    fun hideReceiptModal() {
+        _showReceiptModal.value = false
+    }
+
+    fun selectReceiptType(type: String?) {
+        _selectedReceiptType.value = type
+        hideReceiptModal()
     }
 }
