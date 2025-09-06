@@ -52,7 +52,7 @@ class HomeViewModel @Inject constructor(
         fetchProducts()
     }
 
-    private fun fetchProducts() {
+    fun fetchProducts() {
         viewModelScope.launch {
             Log.d(TAG, "fetchProducts: Fetching products from repository...")
             val productList = repository.getProducts()
