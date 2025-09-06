@@ -1,6 +1,7 @@
 package com.example.laravelpos.data.repository
 
 import android.content.SharedPreferences
+import android.util.Log
 import com.example.laravelpos.data.model.Product
 import com.example.laravelpos.data.model.ProductResponse
 import kotlinx.coroutines.withContext
@@ -58,6 +59,7 @@ class ProductRepository @Inject constructor(
                     emptyList() // Manejo seguro de errores
                 }
             } else {
+                Log.d("ProductRepository", "getProducts: - No hay token lista vacia")
                 emptyList() // Si no hay token, retorna lista vacía
             }
         }
