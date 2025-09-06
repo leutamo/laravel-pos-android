@@ -283,6 +283,7 @@ fun SummaryScreen(navController: NavController, homeViewModel: HomeViewModel, qu
                             // Borra toda la pila y navega a la pantalla de inicio
                             navController.popBackStack("home", inclusive = false)
                             homeViewModel.clearCart() // Limpia el carrito para la próxima venta
+                            homeViewModel.selectReceiptType(null)
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
