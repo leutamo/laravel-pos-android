@@ -24,7 +24,7 @@ class HomeViewModel @Inject constructor(
     private val repository: ProductRepository
 ) : ViewModel() {
     private val _products = MutableStateFlow<List<Product>>(emptyList())
-    val products: StateFlow<List<Product>> = _products
+    val products: StateFlow<List<Product>> = _products.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -52,7 +52,7 @@ class HomeViewModel @Inject constructor(
         fetchProducts()
     }
 
-    fun fetchProducts() {
+    private fun fetchProducts() {
         viewModelScope.launch {
             Log.d(TAG, "fetchProducts: Fetching products from repository...")
             val productList = repository.getProducts()
