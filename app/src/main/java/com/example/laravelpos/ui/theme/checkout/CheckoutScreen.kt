@@ -45,59 +45,83 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.laravelpos.viewmodel.CheckoutViewModel
 import com.example.laravelpos.viewmodel.HomeViewModel
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
+fun CheckoutScreen(
+    navController: NavController,
+    homeViewModel: HomeViewModel,
+    checkoutViewModel: CheckoutViewModel // ✅ ¡Nuevo ViewModel inyectado!
+) {
+    // Datos que aún vienen de HomeViewModel (porque quizás se calculan en el carrito)
     val totalAmount by homeViewModel.totalAmount.collectAsState()
     val selectedReceiptType by homeViewModel.selectedReceiptType.collectAsState()
 
-    var dniText by remember { mutableStateOf("") }
-    var pagoEfectivo by remember { mutableStateOf("0.00") }
-    var pagoVisa by remember { mutableStateOf("0.00") }
-    var totalRecibido by remember { mutableStateOf("0.00") }
-    var pagoContado by remember { mutableStateOf(true) }
+    // ✅ Estados del formulario desde CheckoutViewModel
+    val dniText by checkoutViewModel.dniText.collectAsState()
+    val pagoEfectivo by checkoutViewModel.pagoEfectivo.collectAsState()
+    val pagoVisa by checkoutViewModel.pagoVisa.collectAsState()
+    val totalRecibido by checkoutViewModel.totalRecibido.collectAsState()
+    val pagoContado by checkoutViewModel.pagoContado.collectAsState()
 
-    val documentTypes = listOf("DNI", "RUC", "Carnet de extranjería", "Pasaporte")
+    // ✅ Tipos de documento desde API
+    val documentTypes by checkoutViewModel.documentTypes.collectAsState()
+    val isLoadingDocumentTypes by checkoutViewModel.isLoadingDocumentTypes.collectAsState()
+    val documentTypeNames = documentTypes.map { it.name }
+
+    // ✅ Estado local del dropdown (solo UI, no necesita guardarse en ViewModel)
     var expanded by remember { mutableStateOf(false) }
-    var selectedDocumentType by remember { mutableStateOf(documentTypes[0]) }
+    var selectedDocumentType by remember {
+        mutableStateOf(documentTypeNames.firstOrNull() ?: "DNI")
+    }
 
-    val isLoading by homeViewModel.isLoading.collectAsState()
+    // ✅ Estados de carga, error y navegación desde CheckoutViewModel
+    val isLoading by checkoutViewModel.isLoading.collectAsState()
+    val apiError by checkoutViewModel.apiError.collectAsState()
+    val navigateToSummary by checkoutViewModel.navigateToSummary.collectAsStateWithLifecycle()
 
-    val apiError by homeViewModel.apiError.collectAsState()
+    // ✅ Cargar tipos de documento al iniciar
+    LaunchedEffect(Unit) {
+        checkoutViewModel.loadDocumentTypes()
+    }
 
-    val navigateToSummary by homeViewModel.navigateToSummary.collectAsStateWithLifecycle()
-
+    // ✅ Navegar al resumen cuando se emite un ID
     LaunchedEffect(navigateToSummary) {
         navigateToSummary?.let { id ->
             navController.navigate("summary_screen/$id")
-            homeViewModel.onSummaryNavigated()
+            checkoutViewModel.onSummaryNavigated()
         }
     }
 
+    // ✅ Mostrar diálogo de error si existe
     if (apiError != null) {
         AlertDialog(
-            onDismissRequest = {
-                // Cierra el diálogo cuando el usuario hace clic fuera de él
-                homeViewModel.clearApiError()
-            },
-            title = {
-                Text(text = "Error del Servidor", color = Color.Red)
-            },
-            text = {
-                Text(text = apiError!!)
-            },
+            onDismissRequest = { checkoutViewModel.clearApiError() },
+            title = { Text(text = "Error del Servidor", color = Color.Red) },
+            text = { Text(text = apiError!!) },
             confirmButton = {
-                Button(
-                    onClick = {
-                        homeViewModel.clearApiError()
-                    }
-                ) {
+                Button(onClick = { checkoutViewModel.clearApiError() }) {
                     Text("Aceptar")
                 }
             }
         )
+    }
+
+    // ✅ Mostrar pantalla de carga inicial si es necesario
+    if (isLoadingDocumentTypes && documentTypes.isEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Cargando tipos de documento...")
+        }
+        return
     }
 
     Scaffold(
@@ -106,7 +130,7 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 title = { Text(text = selectedReceiptType ?: "Finalizar Compra") },
                 navigationIcon = {
                     IconButton(onClick = {
-                        navController.popBackStack() // Retrocede a "cart"
+                        navController.popBackStack()
                         homeViewModel.selectReceiptType(null)
                     }) {
                         Icon(
@@ -116,14 +140,14 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Implementar lógica de chat */ }) {
+                    IconButton(onClick = { /* TODO: Chat */ }) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Chat",
                             modifier = Modifier.size(24.dp)
                         )
                     }
-                    IconButton(onClick = { /* TODO: Implementar lógica de usuarios */ }) {
+                    IconButton(onClick = { /* TODO: Usuarios */ }) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Usuarios",
@@ -165,11 +189,10 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Dropdown para seleccionar el tipo de documento
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.fillMaxWidth() // <-- El cambio principal: ahora ocupa todo el ancho
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
                         readOnly = true,
@@ -177,9 +200,7 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                         onValueChange = { },
                         label = { Text("Tipo") },
                         trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(
-                                expanded = expanded
-                            )
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                         },
                         modifier = Modifier
                             .menuAnchor()
@@ -189,7 +210,7 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
                     ) {
-                        documentTypes.forEach { selectionOption ->
+                        documentTypeNames.forEach { selectionOption ->
                             androidx.compose.material3.DropdownMenuItem(
                                 text = { Text(selectionOption) },
                                 onClick = {
@@ -200,26 +221,26 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp)) // <-- Espacio entre el selector y el campo de texto
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Campo de texto para el número de documento
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
                         value = dniText,
-                        onValueChange = { dniText = it },
+                        onValueChange = { checkoutViewModel.updateDni(it) }, // ✅ Actualiza en ViewModel
                         label = { Text(selectedDocumentType) },
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { /* TODO: Lógica para DNI genérico */ }) {
+                    Button(onClick = { /* TODO: DNI genérico */ }) {
                         Text("Genérico")
                     }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
+
             // Radio buttons para Contado y Crédito
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -227,12 +248,12 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
             ) {
                 RadioButton(
                     selected = pagoContado,
-                    onClick = { pagoContado = true }
+                    onClick = { checkoutViewModel.updatePagoContado(true) } // ✅
                 )
                 Text("Contado", modifier = Modifier.weight(1f))
                 RadioButton(
                     selected = !pagoContado,
-                    onClick = { pagoContado = false }
+                    onClick = { checkoutViewModel.updatePagoContado(false) } // ✅
                 )
                 Text("Crédito", modifier = Modifier.weight(1f))
             }
@@ -243,7 +264,7 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 Column {
                     OutlinedTextField(
                         value = pagoEfectivo,
-                        onValueChange = { pagoEfectivo = it },
+                        onValueChange = { checkoutViewModel.updatePagoEfectivo(it) }, // ✅
                         label = { Text("Pago efectivo") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -251,7 +272,7 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = pagoVisa,
-                        onValueChange = { pagoVisa = it },
+                        onValueChange = { checkoutViewModel.updatePagoVisa(it) }, // ✅
                         label = { Text("Pago Visa") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -259,7 +280,7 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = totalRecibido,
-                        onValueChange = { totalRecibido = it },
+                        onValueChange = { checkoutViewModel.updateTotalRecibido(it) }, // ✅
                         label = { Text("Total recibido") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -267,11 +288,12 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 }
             } else {
                 // TODO: Implementar campos para pago a crédito
+                Text("Campos de crédito pendientes...")
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Total y Vuelto
+            // Total y Vuelto — por ahora fijo, luego lo calculamos
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -299,7 +321,7 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
             ) {
                 Button(
                     onClick = {
-                        navController.popBackStack() // Retrocede a "cart"
+                        navController.popBackStack()
                         homeViewModel.selectReceiptType(null)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
@@ -310,15 +332,11 @@ fun CheckoutScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 Spacer(modifier = Modifier.width(16.dp))
                 Button(
                     onClick = {
-                        Log.d(
-                            "CheckoutScreen",
-                            "Botón Cobrar presionado"
-                        ) // Log para verificar el clic
-                        homeViewModel.processCheckout()
+                        Log.d("CheckoutScreen", "Botón Cobrar presionado")
+                        checkoutViewModel.processCheckout(totalAmount, selectedReceiptType) // ✅ ¡Nuevo!
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
                     modifier = Modifier.weight(1f),
-                    // Deshabilitar el botón cuando está cargando
                     enabled = !isLoading
                 ) {
                     if (isLoading) {

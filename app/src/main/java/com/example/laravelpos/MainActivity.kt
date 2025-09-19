@@ -17,6 +17,7 @@ import com.example.laravelpos.ui.theme.checkout.CheckoutScreen
 import com.example.laravelpos.ui.theme.home.HomeScreen
 import com.example.laravelpos.ui.theme.login.LoginScreen
 import com.example.laravelpos.ui.theme.summary.SummaryScreen
+import com.example.laravelpos.viewmodel.CheckoutViewModel
 import com.example.laravelpos.viewmodel.HomeViewModel
 import com.example.laravelpos.viewmodel.LoginViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -38,6 +39,7 @@ fun AppNavigation() {
     val navController = rememberNavController()
     val viewModel: LoginViewModel = hiltViewModel()
     val homeViewModel: HomeViewModel = hiltViewModel() // Única instancia creada aquí
+    val checkoutViewModel: CheckoutViewModel = hiltViewModel()
     val startDestination = if (viewModel.isLoggedIn()) "home" else "login"
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -51,7 +53,10 @@ fun AppNavigation() {
             CartScreen(navController, homeViewModel)
         }
         composable("checkout") { backStackEntry ->
-            CheckoutScreen(navController, homeViewModel)
+            CheckoutScreen(
+                navController, homeViewModel,
+                checkoutViewModel
+            )
         }
         /*
         // Nueva ruta para la pantalla de resumen
