@@ -1,6 +1,7 @@
 package com.example.laravelpos.ui.theme.checkout
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -40,15 +42,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.laravelpos.viewmodel.CheckoutViewModel
 import com.example.laravelpos.viewmodel.HomeViewModel
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CheckoutScreen(
@@ -56,32 +58,37 @@ fun CheckoutScreen(
     homeViewModel: HomeViewModel,
     checkoutViewModel: CheckoutViewModel // ✅ ¡Nuevo ViewModel inyectado!
 ) {
+    val context = LocalContext.current
     // Datos que aún vienen de HomeViewModel (porque quizás se calculan en el carrito)
     val totalAmount by homeViewModel.totalAmount.collectAsState()
     val selectedReceiptType by homeViewModel.selectedReceiptType.collectAsState()
 
     // ✅ Estados del formulario desde CheckoutViewModel
-    val dniText by checkoutViewModel.dniText.collectAsState()
+    val dniText by checkoutViewModel.dniText.collectAsStateWithLifecycle()
     val pagoEfectivo by checkoutViewModel.pagoEfectivo.collectAsState()
     val pagoVisa by checkoutViewModel.pagoVisa.collectAsState()
     val totalRecibido by checkoutViewModel.totalRecibido.collectAsState()
     val pagoContado by checkoutViewModel.pagoContado.collectAsState()
 
-    // ✅ Tipos de documento desde API
+    // ✅ Estados del ViewModel para control y tipos de documento
     val documentTypes by checkoutViewModel.documentTypes.collectAsState()
     val isLoadingDocumentTypes by checkoutViewModel.isLoadingDocumentTypes.collectAsState()
-    val documentTypeNames = documentTypes.map { it.name }
-
-    // ✅ Estado local del dropdown (solo UI, no necesita guardarse en ViewModel)
-    var expanded by remember { mutableStateOf(false) }
-    var selectedDocumentType by remember {
-        mutableStateOf(documentTypeNames.firstOrNull() ?: "DNI")
-    }
+    val isDniFieldEnabled by checkoutViewModel.isDniFieldEnabled.collectAsState() // Nuevo estado
+    val selectedDocType by checkoutViewModel.selectedDocumentType.collectAsState() // Usamos el estado del ViewModel
+    val isLoadingCustomer by checkoutViewModel.isLoadingCustomer.collectAsState() // Añadido para resolver el error
 
     // ✅ Estados de carga, error y navegación desde CheckoutViewModel
     val isLoading by checkoutViewModel.isLoading.collectAsState()
     val apiError by checkoutViewModel.apiError.collectAsState()
     val navigateToSummary by checkoutViewModel.navigateToSummary.collectAsStateWithLifecycle()
+
+    // 2. Lanza un efecto para escuchar los eventos del ViewModel
+    LaunchedEffect(Unit) {
+        // Collecta el flujo de eventos del Toast
+        checkoutViewModel.toastEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // ✅ Cargar tipos de documento al iniciar
     LaunchedEffect(Unit) {
@@ -189,14 +196,15 @@ fun CheckoutScreen(
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
+                var expanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(
                     expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
+                    onExpandedChange = { expanded = it },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
                         readOnly = true,
-                        value = selectedDocumentType,
+                        value = selectedDocType ?: "Seleccionar tipo de documento",
                         onValueChange = { },
                         label = { Text("Tipo") },
                         trailingIcon = {
@@ -210,11 +218,11 @@ fun CheckoutScreen(
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
                     ) {
-                        documentTypeNames.forEach { selectionOption ->
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(selectionOption) },
+                        documentTypes.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type.name) },
                                 onClick = {
-                                    selectedDocumentType = selectionOption
+                                    checkoutViewModel.updateSelectedDocumentType(type.name) // Usamos name en lugar de code
                                     expanded = false
                                 }
                             )
@@ -230,8 +238,9 @@ fun CheckoutScreen(
                     OutlinedTextField(
                         value = dniText,
                         onValueChange = { checkoutViewModel.updateDni(it) }, // ✅ Actualiza en ViewModel
-                        label = { Text(selectedDocumentType) },
-                        modifier = Modifier.weight(1f)
+                        label = { Text(selectedDocType ?: "DNI/RUC") },
+                        modifier = Modifier.weight(1f),
+                        enabled = isDniFieldEnabled && !isLoadingCustomer // Bloqueo hasta seleccionar tipo y durante carga
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { /* TODO: DNI genérico */ }) {
