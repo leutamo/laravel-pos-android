@@ -91,6 +91,21 @@ class CheckoutViewModel @Inject constructor(
         _selectedDocumentType.value = type
         _isDniFieldEnabled.value = type != null // Habilita el campo DNI solo si hay un tipo seleccionado
     }
+    // Nueva función para crear un cliente
+    fun createCustomer(customer: Customer) {
+        viewModelScope.launch {
+            _isLoadingCustomer.value = true
+            try {
+                _customerData.value = customer
+                _toastEvent.emit("Cliente creado: ${customer.attributes.name}")
+            } catch (e: Exception) {
+                Log.e("CheckoutViewModel", "Error al crear cliente: ${e.message}")
+                _toastEvent.emit("Error al crear cliente: ${e.message}")
+            } finally {
+                _isLoadingCustomer.value = false
+            }
+        }
+    }
 
     // ✅ LÓGICA PRINCIPAL (INIT) - Ajustada para simular llamada a API con Toast
     init {

@@ -1,7 +1,9 @@
 package com.example.laravelpos.ui.theme.checkout
 
+import android.os.Build
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,8 +51,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.laravelpos.data.model.Customer
+import com.example.laravelpos.data.model.CustomerAttributes
+import com.example.laravelpos.data.model.CustomerLinks
 import com.example.laravelpos.viewmodel.CheckoutViewModel
 import com.example.laravelpos.viewmodel.HomeViewModel
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CheckoutScreen(
@@ -81,6 +87,9 @@ fun CheckoutScreen(
     val isLoading by checkoutViewModel.isLoading.collectAsState()
     val apiError by checkoutViewModel.apiError.collectAsState()
     val navigateToSummary by checkoutViewModel.navigateToSummary.collectAsStateWithLifecycle()
+
+    // ✅ Estado para controlar la visibilidad del modal
+    var showCreateCustomerDialog by remember { mutableStateOf(false) }
 
     // 2. Lanza un efecto para escuchar los eventos del ViewModel
     LaunchedEffect(Unit) {
@@ -247,6 +256,17 @@ fun CheckoutScreen(
                         Text("Genérico")
                     }
                 }
+
+                // ✅ Nuevo botón para crear cliente
+                Button(
+                    onClick = { showCreateCustomerDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Blue)
+                ) {
+                    Text("Crear Nuevo Cliente", color = Color.White)
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -357,6 +377,121 @@ fun CheckoutScreen(
                         Text("Cobrar")
                     }
                 }
+            }
+
+            // ✅ Modal para crear nuevo cliente TODO: Validar campos hardcodeados
+            if (showCreateCustomerDialog) {
+                var name by remember { mutableStateOf("walk-in-customer") }
+                var email by remember { mutableStateOf("customer@infypos.com") }
+                var phone by remember { mutableStateOf("123456789") }
+                var country by remember { mutableStateOf("india") }
+                var city by remember { mutableStateOf("mumbai") }
+                var address by remember { mutableStateOf("Dr Deshmukh Marg , mumbai") }
+                var documentNumber by remember { mutableStateOf("123456") }
+                var documentTypeId by remember { mutableStateOf(1) }
+
+                AlertDialog(
+                    onDismissRequest = { showCreateCustomerDialog = false },
+                    title = { Text("Crear Nuevo Cliente") },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { name = it },
+                                label = { Text("Nombre") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = { email = it },
+                                label = { Text("Email") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = phone,
+                                onValueChange = { phone = it },
+                                label = { Text("Teléfono") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = country,
+                                onValueChange = { country = it },
+                                label = { Text("País") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = city,
+                                onValueChange = { city = it },
+                                label = { Text("Ciudad") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = address,
+                                onValueChange = { address = it },
+                                label = { Text("Dirección") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = documentNumber,
+                                onValueChange = { documentNumber = it },
+                                label = { Text("Número de Documento") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = documentTypeId.toString(),
+                                onValueChange = { documentTypeId = it.toIntOrNull() ?: 1 },
+                                label = { Text("ID Tipo de Documento") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val currentTime = java.time.OffsetDateTime.now().toString()
+                                val newCustomer = Customer(
+                                    type = "customers",
+                                    id = 0, // Placeholder, la API asignará el ID real
+                                    attributes = CustomerAttributes(
+                                        name = name,
+                                        email = email,
+                                        phone = phone,
+                                        country = country,
+                                        city = city,
+                                        address = address,
+                                        dob = null,
+                                        document_number = documentNumber,
+                                        document_type_id = documentTypeId,
+                                        created_at = currentTime,
+                                        updated_at = currentTime
+                                    ),
+                                    links = CustomerLinks(
+                                        self = "http://localhost:8000/api/customers/2" // Placeholder
+                                    )
+                                )
+                                // Usamos la nueva función del ViewModel
+                                checkoutViewModel.createCustomer(newCustomer)
+                                showCreateCustomerDialog = false
+                            }
+                        ) {
+                            Text("Crear")
+                        }
+                    },
+                    dismissButton = {
+                        Button(onClick = { showCreateCustomerDialog = false }) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
             }
         }
     }
