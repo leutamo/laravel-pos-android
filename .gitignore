@@ -9,6 +9,8 @@
 /.idea/assetWizardSettings.xml
 .idea/studiobot.xml
 .idea/deploymentTargetSelector.xml
+.idea/inspectionProfiles/
+.kotlin/
 .DS_Store
 /build
 /captures
