@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,258 +41,198 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.laravelpos.viewmodel.HomeViewModel
+import com.example.laravelpos.viewmodel.SummaryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SummaryScreen(navController: NavController, homeViewModel: HomeViewModel, quotationId: Int) {
-    val cartItems by homeViewModel.cartItems.collectAsState()
-    val totalAmount by homeViewModel.totalAmount.collectAsState()
-    val igvAmount by homeViewModel.igvAmount.collectAsState()
-    val itemQuantities by homeViewModel.itemQuantities.collectAsState()
-    val selectedReceiptType by homeViewModel.selectedReceiptType.collectAsState()
+fun SummaryScreen(
+    navController: NavController,
+    homeViewModel: HomeViewModel,
+    quotationId: Int,
+    summaryViewModel: SummaryViewModel = hiltViewModel()
+) {
+    val state by summaryViewModel.state.collectAsState()
+    val quotation = state.quotation
+
+    LaunchedEffect(quotationId) {
+        summaryViewModel.loadQuotation(quotationId)
+    }
 
     var emailText by remember { mutableStateOf("") }
 
-    // Valores fijos para el resumen, basados en el diseño
-    val subTotal = totalAmount / 1.18
-    val totalPaid = 0.50
-    val change = 0.10
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "${selectedReceiptType ?: "Resumen de Compra"} #$quotationId",
-                            color = Color.White,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
-                },
-                /*                navigationIcon = {
-                                    IconButton(onClick = { navController.popBackStack() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowBack,
-                                            contentDescription = "Regresar",
-                                            tint = Color.White
-                                        )
-                                    }
-                                },*/
-                actions = {
-                    IconButton(onClick = { /* TODO: Lógica de compartir */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Compartir",
-                            tint = Color.White
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
-            )
+    if (state.isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.CircularProgressIndicator()
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Título de totales
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "Total cobrado",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "S/ ${String.format("%.2f", totalAmount)}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            // Encabezados de la tabla
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.LightGray)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "PRODUCTO",
-                    modifier = Modifier.weight(2f),
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "PRECIO",
-                    modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "#",
-                    modifier = Modifier.weight(0.5f),
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "UNIDAD",
-                    modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "TOTAL",
-                    modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+    } else if (quotation != null) {
+        val attr = quotation.attributes
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Cotización #${attr.referenceCode}",
+                                color = Color.White,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { /* TODO: Lógica de compartir */ }) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Compartir",
+                                tint = Color.White
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
                 )
             }
-
-            // Lista de productos
-            LazyColumn(
-                modifier = Modifier.weight(1f)
-            ) {
-                items(cartItems) { product ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = product.attributes.name,
-                            modifier = Modifier.weight(2f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "S/ ${String.format("%.2f", product.attributes.product_price)}",
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "${itemQuantities[product.id.toString()] ?: 0}",
-                            modifier = Modifier.weight(0.5f)
-                        )
-                        Text(
-                            text = "UNIDA",
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "S/ ${
-                                String.format(
-                                    "%.2f",
-                                    homeViewModel.calculateItemTotal(product)
-                                )
-                            }",
-                            modifier = Modifier.weight(1f),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // Sección de totales y vuelto
+        ) { paddingValues ->
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.End
+                    .fillMaxSize()
+                    .padding(paddingValues)
             ) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = "Sub Total", modifier = Modifier.weight(1f))
-                    Text(
-                        text = "S/ ${String.format("%.2f", subTotal)}",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = "IGV", modifier = Modifier.weight(1f))
-                    Text(
-                        text = "S/ ${String.format("%.2f", igvAmount)}",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "TOTAL",
-                        modifier = Modifier.weight(1f),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "S/ ${String.format("%.2f", totalAmount)}",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = "Pago:", modifier = Modifier.weight(1f))
-                    Text(
-                        text = "S/ ${String.format("%.2f", totalPaid)}",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = "Vuelto:", modifier = Modifier.weight(1f))
-                    Text(text = "S/ ${String.format("%.2f", change)}", fontWeight = FontWeight.Bold)
-                }
-            }
-
-            // Sección de Email y botones de acción
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                OutlinedTextField(
-                    value = emailText,
-                    onValueChange = { emailText = it },
-                    label = { Text("Email") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+                // Título de totales
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Button(
-                        onClick = { /* TODO: Lógica de envío */ },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
-                    ) {
-                        Text("Enviar")
+                    Text(
+                        text = "Total cobrado",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "S/ ${String.format("%.2f", attr.grandTotal)}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Encabezados de la tabla
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.LightGray)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "PRODUCTO", modifier = Modifier.weight(2f), fontWeight = FontWeight.Bold)
+                    Text(text = "PRECIO", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                    Text(text = "#", modifier = Modifier.weight(0.5f), fontWeight = FontWeight.Bold)
+                    Text(text = "UNIDAD", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                    Text(text = "TOTAL", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+
+                // Lista de productos
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(attr.quotationItems) { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Producto ${item.productId}", // TODO: El servidor debería devolver el nombre
+                                modifier = Modifier.weight(2f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(text = "S/ ${String.format("%.2f", item.productPrice)}", modifier = Modifier.weight(1f))
+                            Text(text = "${item.quantity}", modifier = Modifier.weight(0.5f))
+                            Text(text = item.saleUnit.shortName, modifier = Modifier.weight(1f))
+                            Text(text = "S/ ${String.format("%.2f", item.subTotal)}", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                        }
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Button(
-                        onClick = {
-                            // Borra toda la pila y navega a la pantalla de inicio
-                            navController.popBackStack("home", inclusive = false)
-                            homeViewModel.clearCart() // Limpia el carrito para la próxima venta
-                            homeViewModel.selectReceiptType(null)
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                    ) {
-                        Text("Finalizar")
+                }
+
+                // Sección de totales y vuelto
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(text = "Sub Total", modifier = Modifier.weight(1f))
+                        Text(text = "S/ ${String.format("%.2f", attr.grandTotal - attr.taxAmount)}", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(text = "IGV (${attr.taxRate}%)", modifier = Modifier.weight(1f))
+                        Text(text = "S/ ${String.format("%.2f", attr.taxAmount)}", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(text = "TOTAL", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                        Text(text = "S/ ${String.format("%.2f", attr.grandTotal)}", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(text = "Pago:", modifier = Modifier.weight(1f))
+                        Text(text = "S/ ${String.format("%.2f", attr.receivedAmount)}", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(text = "Vuelto:", modifier = Modifier.weight(1f))
+                        Text(text = "S/ ${String.format("%.2f", attr.receivedAmount - attr.grandTotal)}", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Sección de Email y botones de acción
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    OutlinedTextField(
+                        value = emailText,
+                        onValueChange = { emailText = it },
+                        label = { Text("Email") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Button(
+                            onClick = { /* TODO: Lógica de envío */ },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
+                        ) {
+                            Text("Enviar")
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Button(
+                            onClick = {
+                                navController.navigate("home") {
+                                    popUpTo("home") { inclusive = true }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                        ) {
+                            Text("Finalizar")
+                        }
                     }
                 }
             }
+        }
+    } else {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(text = state.error ?: "Error desconocido")
         }
     }
 }

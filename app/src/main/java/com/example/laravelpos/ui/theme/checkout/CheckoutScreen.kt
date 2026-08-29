@@ -107,6 +107,7 @@ fun CheckoutScreen(
     // ✅ Navegar al resumen cuando se emite un ID
     LaunchedEffect(navigateToSummary) {
         navigateToSummary?.let { id ->
+            homeViewModel.clearCart() // ✅ Limpiar el carrito tras éxito
             navController.navigate("summary_screen/$id")
             checkoutViewModel.onSummaryNavigated()
         }
@@ -359,10 +360,19 @@ fun CheckoutScreen(
                     Text("Atrás")
                 }
                 Spacer(modifier = Modifier.width(16.dp))
+                // Datos del carrito desde HomeViewModel
+                val cartItems by homeViewModel.cartItems.collectAsState()
+                val itemQuantities by homeViewModel.itemQuantities.collectAsState()
+
                 Button(
                     onClick = {
                         Log.d("CheckoutScreen", "Botón Cobrar presionado")
-                        checkoutViewModel.processCheckout(totalAmount, selectedReceiptType) // ✅ ¡Nuevo!
+                        checkoutViewModel.processCheckout(
+                            totalAmount = totalAmount,
+                            selectedReceiptType = selectedReceiptType,
+                            cartItems = cartItems,
+                            itemQuantities = itemQuantities
+                        )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
                     modifier = Modifier.weight(1f),

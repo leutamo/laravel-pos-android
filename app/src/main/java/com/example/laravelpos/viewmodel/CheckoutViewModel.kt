@@ -7,7 +7,11 @@ import com.example.laravelpos.data.model.Customer
 import com.example.laravelpos.data.model.CustomerAttributes
 import com.example.laravelpos.data.model.CustomerLinks
 import com.example.laravelpos.data.model.DocumentType
+import com.example.laravelpos.data.model.Product
+import com.example.laravelpos.data.model.QuotationItem
+import com.example.laravelpos.data.model.QuotationRequest
 import com.example.laravelpos.data.repository.DocumentTypeRepository
+import com.example.laravelpos.data.repository.QuotationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -19,12 +23,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.time.OffsetDateTime
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
-    private val documentTypeRepository: DocumentTypeRepository
+    private val documentTypeRepository: DocumentTypeRepository,
+    private val quotationRepository: QuotationRepository
 ) : ViewModel() {
 
     // Estado para tipos de documento
@@ -186,16 +194,82 @@ class CheckoutViewModel @Inject constructor(
     fun onSummaryNavigated() { _navigateToSummary.value = null }
 
     // Lógica de procesar checkout
-    fun processCheckout(totalAmount: Double, selectedReceiptType: String?) {
+    fun processCheckout(
+        totalAmount: Double,
+        selectedReceiptType: String?,
+        cartItems: List<Product>,
+        itemQuantities: Map<String, Int>
+    ) {
+        // Obtenemos el cliente seleccionado. 
+        // Si no hay uno, usamos el ID 6 como cliente de prueba (según plataforma web)
+        val customerId = _customerData.value?.id ?: 6 
+
         viewModelScope.launch {
             _isLoading.value = true
+            _apiError.value = null
             try {
-                // Aquí llamas a tu API de checkout
-                // val response = checkoutRepository.checkout(...)
-                // _navigateToSummary.value = response.id
-                _navigateToSummary.value = "123" // Simulación
+                // 1. Mapear items del carrito al formato de Cotización
+                val quotationItems = cartItems.map { product ->
+                    val quantity = itemQuantities[product.id.toString()] ?: 0
+                    val subTotal = product.attributes.product_price * quantity
+                    
+                    // Ajuste de impuestos (IGV 18%) similar a HomeViewModel
+                    val netUnitPrice = product.attributes.product_price / 1.18
+                    val taxAmount = subTotal - (netUnitPrice * quantity)
+
+                    QuotationItem(
+                        productId = product.id,
+                        quantity = quantity,
+                        productPrice = String.format("%.2f", product.attributes.product_price),
+                        netUnitPrice = String.format("%.2f", netUnitPrice),
+                        taxType = 1, // Gravado
+                        taxValue = "18.00",
+                        taxAmount = String.format("%.2f", taxAmount),
+                        discountType = 2,
+                        discountValue = "0.00",
+                        discountAmount = "0.00",
+                        saleUnit = 1,
+                        subTotal = String.format("%.2f", subTotal)
+                    )
+                }
+
+                // 2. Formatear fecha ISO
+                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+                val currentDate = isoFormat.format(Date())
+
+                // 3. Calcular impuestos totales
+                val totalIgv = totalAmount - (totalAmount / 1.18)
+
+                // 4. Construir el Request (Payload igual al de la plataforma web)
+                val request = QuotationRequest(
+                    date = currentDate,
+                    customerId = customerId,
+                    warehouseId = 1, 
+                    status = 1, // Enviado
+                    taxRate = "18.00",
+                    taxAmount = String.format("%.2f", totalIgv),
+                    discount = "0.00",
+                    shipping = "0.00",
+                    grandTotal = String.format("%.2f", totalAmount),
+                    receivedAmount = _totalRecibido.value.toDoubleOrNull() ?: 0.0,
+                    paidAmount = _totalRecibido.value.toDoubleOrNull() ?: 0.0,
+                    note = "Cotización desde App Android",
+                    quotationItems = quotationItems
+                )
+
+                // 5. Llamar al repositorio
+                val result = quotationRepository.createQuotation(request)
+
+                if (result.success) {
+                    Log.d("CheckoutViewModel", "Cotización creada ID: ${result.data?.id}")
+                    _toastEvent.emit("Cotización realizada con éxito")
+                    _navigateToSummary.value = result.data?.id.toString()
+                } else {
+                    _apiError.value = result.message
+                }
             } catch (e: Exception) {
-                _apiError.value = e.message ?: "Error desconocido"
+                Log.e("CheckoutViewModel", "Error en checkout: ${e.message}", e)
+                _apiError.value = "Error al procesar la cotización: ${e.message}"
             } finally {
                 _isLoading.value = false
             }

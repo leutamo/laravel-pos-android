@@ -4,10 +4,10 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.Product
+import com.example.laravelpos.data.model.QuotationItem
+import com.example.laravelpos.data.model.QuotationRequest
 import com.example.laravelpos.data.repository.ProductRepository
-import com.example.laravelpos.data.repository.QuotationItem
 import com.example.laravelpos.data.repository.QuotationRepository
-import com.example.laravelpos.data.repository.QuotationRequest
 import com.example.laravelpos.data.config.ServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -220,46 +220,54 @@ class HomeViewModel @Inject constructor(
                 // Obtener los datos del carrito
                 val items = _cartItems.value
                 val quantities = _itemQuantities.value
+                val currentTotal = totalAmount.value
+                val currentIgv = igvAmount.value
 
                 // Construir la lista de items para la petición
                 val quotationItems = items.map { product ->
                     val quantity = quantities[product.id.toString()] ?: 0
                     val subTotal = product.attributes.product_price * quantity
+                    
+                    // Calculamos el precio neto (sin IGV) para coincidir con la plataforma
+                    // Si el precio incluye IGV: neto = total / 1.18
+                    val netUnitPrice = product.attributes.product_price / 1.18
+                    val taxAmount = subTotal - (netUnitPrice * quantity)
+
                     QuotationItem(
-                        productId = product.id.toString(),
+                        productId = product.id,
                         quantity = quantity,
-                        netUnitPrice = product.attributes.product_price,
-                        taxType = 2,
-                        taxValue = 0.0,
-                        taxAmount = 0.0,
+                        productPrice = String.format("%.2f", product.attributes.product_price),
+                        netUnitPrice = String.format("%.2f", netUnitPrice),
+                        taxType = 1, // 1 suele ser Gravado / con Impuesto
+                        taxValue = "18.00",
+                        taxAmount = String.format("%.2f", taxAmount),
                         discountType = 2,
-                        discountValue = 0.0,
-                        discountAmount = 0.0,
+                        discountValue = "0.00",
+                        discountAmount = "0.00",
                         saleUnit = 1,
-                        subTotal = subTotal,
-                        productPrice = product.attributes.product_price,
+                        subTotal = String.format("%.2f", subTotal)
                     )
                 }
 
-                // Obtener la fecha actual en el formato YYYY-MM-DD
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                val currentDate = dateFormat.format(Date())
+                // Obtener la fecha en formato ISO (como en la plataforma)
+                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+                val currentDate = isoFormat.format(Date())
 
-                // Construir el cuerpo de la petición
+                // Construir el cuerpo de la petición basado en los screenshots
                 val requestBody = QuotationRequest(
                     date = currentDate,
-                    customerId = 1, //TODO: CAmbiar a un id de cliente correcto
-                    quotationItems = quotationItems,
-                    warehouseId = 1, // TODO: Cambiar con el almacen desde el server,
-                    status = "Pendiente", // TODO: Verificar el status
-                    // Agregamos los campos que faltan con valores de prueba
-                    taxRate = 0.0,
-                    taxAmount = 0.0,
-                    discount = 0.0,
-                    shipping = 0.0,
-                    grandTotal = 0.0,
+                    customerId = 6, // TODO: CAmbiar a un id de cliente dinámico (6 es el de la captura)
+                    warehouseId = 1, // TODO: CAmbiar a almacen dinámico
+                    status = 1, // 1 = Enviado / Activo
+                    taxRate = "18.00",
+                    taxAmount = String.format("%.2f", currentIgv),
+                    discount = "0.00",
+                    shipping = "0.00",
+                    grandTotal = String.format("%.2f", currentTotal),
                     receivedAmount = 0.0,
                     paidAmount = 0.0,
+                    note = "",
+                    quotationItems = quotationItems
                 )
 
                 // Realizar la llamada a la API
@@ -267,15 +275,16 @@ class HomeViewModel @Inject constructor(
 
                 // Manejar la respuesta
                 if (response.success) {
-                    Log.d(TAG, "Respuesta de la API exitosa: La cotización fue creada con el ID: ${response.data?.id}")
+                    Log.d(TAG, "Cotización creada con éxito: ${response.data?.id}")
                     _navigateToSummary.value = response.data?.id
+                    clearCart() // Limpiamos el carrito tras éxito
                 } else {
                     _apiError.value = response.message
-                    Log.e(TAG, "Error de la API: ${response.message}")
+                    Log.e(TAG, "Error al crear cotización: ${response.message}")
                 }
             } catch (e: Exception) {
                 _apiError.value = e.message
-                Log.e(TAG, "Error en la petición: ${e.message}", e)
+                Log.e(TAG, "Error en el proceso de checkout: ${e.message}", e)
             } finally {
                 _isLoading.value = false
             }
