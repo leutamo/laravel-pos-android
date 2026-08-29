@@ -1,6 +1,5 @@
 package com.example.laravelpos.ui.theme.cart
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,7 +38,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -54,17 +52,12 @@ fun CartScreen(
     navController: NavController,
     homeViewModel: HomeViewModel
 ) {
-    val context = LocalContext.current // Obtenemos el contexto actual
-
     val cartItems by homeViewModel.cartItems.collectAsState()
     val totalAmount by homeViewModel.totalAmount.collectAsState()
     val igvAmount by homeViewModel.igvAmount.collectAsState()
     // Modal values
     val selectedReceiptType by homeViewModel.selectedReceiptType.collectAsState()
     val showReceiptModal by homeViewModel.showReceiptModal.collectAsState()
-    // --- LÍNEA DE DEPURACIÓN AÑADIDA ---
-    Toast.makeText(context, "CartScreen: cartItems size is ${cartItems.size}", Toast.LENGTH_SHORT).show()
-    // ---------------------------------
 
     Scaffold(
         topBar = {

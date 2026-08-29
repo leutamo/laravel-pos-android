@@ -14,11 +14,8 @@ import com.example.laravelpos.data.repository.CustomerResult
 import com.example.laravelpos.data.repository.DocumentTypeRepository
 import com.example.laravelpos.data.repository.QuotationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -56,10 +53,6 @@ class CheckoutViewModel @Inject constructor(
 
     private val _isLoadingDocumentTypes = MutableStateFlow(false)
     val isLoadingDocumentTypes: StateFlow<Boolean> = _isLoadingDocumentTypes.asStateFlow()
-
-    // ✅ NUEVO: SharedFlow para enviar eventos de un solo uso (como un Toast)
-    private val _toastEvent = MutableSharedFlow<String>()
-    val toastEvent: SharedFlow<String> = _toastEvent.asSharedFlow()
 
     // Estado del formulario
     private val _dniText = MutableStateFlow("")
@@ -99,15 +92,14 @@ class CheckoutViewModel @Inject constructor(
                 when (val result = customerRepository.createCustomer(customer)) {
                     is CustomerResult.Success -> {
                         _customerData.value = result.customer
-                        _toastEvent.emit("Cliente creado exitosamente")
                     }
                     is CustomerResult.Error -> {
-                        _toastEvent.emit(result.message)
+                        _apiError.value = result.message
                     }
                 }
             } catch (e: Exception) {
                 Log.e("CheckoutViewModel", "Error inesperado al crear cliente: ${e.message}")
-                _toastEvent.emit("Error inesperado: ${e.message}")
+                _apiError.value = "Error inesperado: ${e.message}"
             } finally {
                 _isLoadingCustomer.value = false
             }
@@ -136,14 +128,11 @@ class CheckoutViewModel @Inject constructor(
                             val customer = customerRepository.searchCustomer(dni)
                             if (customer != null) {
                                 _customerData.value = customer
-                                _toastEvent.emit("Cliente encontrado: ${customer.attributes.name}")
                             } else {
                                 _customerData.value = null
-                                _toastEvent.emit("Cliente no registrado")
                             }
                         } catch (e: Exception) {
                             Log.e("CheckoutViewModel", "Error al buscar cliente: ${e.message}")
-                            _toastEvent.emit("Error en la búsqueda")
                         } finally {
                             _isLoadingCustomer.value = false
                         }
@@ -179,14 +168,9 @@ class CheckoutViewModel @Inject constructor(
                     // Luego el DNI y el objeto completo
                     _dniText.value = customer.attributes.document_number
                     _customerData.value = customer
-
-                    _toastEvent.emit("Cliente genérico seleccionado: ${customer.attributes.name}")
-                } else {
-                    _toastEvent.emit("No hay un cliente genérico asignado")
                 }
             } catch (e: Exception) {
                 Log.e("CheckoutViewModel", "Error al seleccionar cliente genérico: ${e.message}")
-                _toastEvent.emit("Error al obtener cliente genérico")
             } finally {
                 _isLoadingCustomer.value = false
             }
@@ -285,7 +269,6 @@ class CheckoutViewModel @Inject constructor(
                 val result = quotationRepository.createQuotation(request)
 
                 if (result.success) {
-                    _toastEvent.emit("Cotización realizada con éxito")
                     _navigateToSummary.value = result.data?.id.toString()
                 } else {
                     _apiError.value = result.message

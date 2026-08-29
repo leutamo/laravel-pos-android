@@ -2,7 +2,6 @@ package com.example.laravelpos.ui.theme.checkout
 
 import android.os.Build
 import android.util.Log
-import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -70,7 +68,6 @@ fun CheckoutScreen(
     homeViewModel: HomeViewModel,
     checkoutViewModel: CheckoutViewModel // ✅ ¡Nuevo ViewModel inyectado!
 ) {
-    val context = LocalContext.current
     // Datos que aún vienen de HomeViewModel (porque quizás se calculan en el carrito)
     val totalAmount by homeViewModel.totalAmount.collectAsState()
     val selectedReceiptType by homeViewModel.selectedReceiptType.collectAsState()
@@ -94,14 +91,6 @@ fun CheckoutScreen(
 
     // ✅ Estado para controlar la visibilidad del modal
     var showCreateCustomerDialog by remember { mutableStateOf(false) }
-
-    // 2. Lanza un efecto para escuchar los eventos del ViewModel
-    LaunchedEffect(Unit) {
-        // Collecta el flujo de eventos del Toast
-        checkoutViewModel.toastEvent.collect { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
-    }
 
     // ✅ Cargar tipos de documento al iniciar
     LaunchedEffect(Unit) {
@@ -495,7 +484,6 @@ fun CheckoutScreen(
                         Button(
                             onClick = {
                                 if (name.isBlank() || email.isBlank() || phone.isBlank()) {
-                                    Toast.makeText(context, "Por favor complete los campos obligatorios", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
 
