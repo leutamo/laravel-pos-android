@@ -10,6 +10,7 @@ import com.example.laravelpos.data.model.DocumentType
 import com.example.laravelpos.data.model.Product
 import com.example.laravelpos.data.model.QuotationItem
 import com.example.laravelpos.data.model.QuotationRequest
+import com.example.laravelpos.data.repository.CustomerRepository
 import com.example.laravelpos.data.repository.DocumentTypeRepository
 import com.example.laravelpos.data.repository.QuotationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,7 +33,8 @@ import javax.inject.Inject
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
     private val documentTypeRepository: DocumentTypeRepository,
-    private val quotationRepository: QuotationRepository
+    private val quotationRepository: QuotationRepository,
+    private val customerRepository: CustomerRepository
 ) : ViewModel() {
 
     // Estado para tipos de documento
@@ -95,8 +97,13 @@ class CheckoutViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoadingCustomer.value = true
             try {
-                _customerData.value = customer
-                _toastEvent.emit("Cliente creado: ${customer.attributes.name}")
+                val createdCustomer = customerRepository.createCustomer(customer)
+                if (createdCustomer != null) {
+                    _customerData.value = createdCustomer
+                    _toastEvent.emit("Cliente creado: ${createdCustomer.attributes.name}")
+                } else {
+                    _toastEvent.emit("Error al crear cliente en el servidor")
+                }
             } catch (e: Exception) {
                 Log.e("CheckoutViewModel", "Error al crear cliente: ${e.message}")
                 _toastEvent.emit("Error al crear cliente: ${e.message}")
@@ -106,54 +113,32 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
-    // ✅ LÓGICA PRINCIPAL (INIT) - Ajustada para simular llamada a API con Toast
+    // ✅ LÓGICA PRINCIPAL (INIT) - Búsqueda real en la base de datos
     init {
         viewModelScope.launch {
             combine(dniText.debounce(500), selectedDocumentType) { dni, docType ->
                 Pair(dni, docType)
             }.collect { (dni, docType) ->
-                Log.d("CheckoutViewModel", "DNI recibido: $dni, Tipo: $docType") // Log de entrada
-
                 val requiredLength = when (docType) {
                     "DNI" -> 8
                     "RUC" -> 11
-                    else -> {
-                        Log.d("CheckoutViewModel", "Tipo de documento no válido o null: $docType")
-                        0
-                    }
+                    else -> 0
                 }
-
-                Log.d("CheckoutViewModel", "Required length: $requiredLength, DNI length: ${dni.length}") // Log del cálculo
 
                 if (dni.length == requiredLength && requiredLength > 0) {
                     _isLoadingCustomer.value = true
-                    Log.d("CheckoutViewModel", "Iniciando búsqueda para DNI: $dni") // Log de confirmación
                     try {
-                        // Simulación de llamada a API
-                        _isLoadingCustomer.value = true // Indica que está procesando
-                        // Simula un retraso como si fuera una llamada a API
-                        delay(1000) // Retraso de 1 segundo para simular
-                        _customerData.value = Customer( // Ejemplo temporal con datos básicos
-                            type = "customers",
-                            id = 1, // ID simulado
-                            attributes = CustomerAttributes(
-                                name = "Cliente $dni",
-                                email = "$dni@example.com",
-                                phone = "987654321",
-                                country = "Perú",
-                                city = "Lima",
-                                address = "Av. Siempre Viva 123",
-                                document_number = dni,
-                                document_type_id = if (docType == "DNI") 1 else 2, // Ejemplo de mapeo
-                                created_at = OffsetDateTime.now().toString(),
-                                updated_at = OffsetDateTime.now().toString()
-                            ),
-                            links = CustomerLinks(self = "http://api.example.com/customers/$dni")
-                        )
-                        _toastEvent.emit("Cliente encontrado para DNI: $dni") // Toast simulado
+                        val customer = customerRepository.searchCustomer(dni)
+                        if (customer != null) {
+                            _customerData.value = customer
+                            _toastEvent.emit("Cliente encontrado: ${customer.attributes.name}")
+                        } else {
+                            _customerData.value = null
+                            _toastEvent.emit("Cliente no registrado")
+                        }
                     } catch (e: Exception) {
-                        Log.e("CheckoutViewModel", "Error en búsqueda simulada: ${e.message}")
-                        _toastEvent.emit("Error al buscar cliente: ${e.message}")
+                        Log.e("CheckoutViewModel", "Error al buscar cliente: ${e.message}")
+                        _toastEvent.emit("Error en la búsqueda")
                     } finally {
                         _isLoadingCustomer.value = false
                     }
