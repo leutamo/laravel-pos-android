@@ -83,7 +83,17 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
 
     val isAuthenticated by viewModel.isAuthenticated.collectAsState()
 
-    var searchText by remember { mutableStateOf(TextFieldValue("")) }
+    val searchQuery by homeViewModel.searchQuery.collectAsState()
+    var searchText by remember { mutableStateOf(TextFieldValue(searchQuery)) }
+    
+    // Sincronizar el estado local del TextField con el ViewModel
+    // Útil cuando el ViewModel limpia la búsqueda (ej: al agregar al carrito)
+    LaunchedEffect(searchQuery) {
+        if (searchQuery != searchText.text) {
+            searchText = TextFieldValue(searchQuery)
+        }
+    }
+
     val context = LocalContext.current
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)

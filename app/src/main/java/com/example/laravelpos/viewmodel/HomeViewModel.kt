@@ -104,6 +104,9 @@ class HomeViewModel @Inject constructor(
 
     // Función para agregar un producto al carrito
     fun addItemToCart(product: Product) {
+        // Limpiamos la búsqueda al agregar un producto (Opción 1)
+        onSearchQueryChanged("")
+
         _cartItems.update { currentItems ->
             // La condición `if (currentItems.any { it.id == product.id })`
             // evita que un producto se añada a esta lista si ya existe.
