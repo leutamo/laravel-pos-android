@@ -37,8 +37,8 @@ data class ProductAttributes(
     val purchase_unit: String,
     val stock_alert: String,
     val quantity_limit: String?,
-    val order_tax: Int,
-    val tax_type: String,
+    val order_tax: Int?,
+    val tax_type: String?,
     val notes: String?,
     @Serializable(with = ProductImagesSerializer::class)
     val images: ProductImages? = null,

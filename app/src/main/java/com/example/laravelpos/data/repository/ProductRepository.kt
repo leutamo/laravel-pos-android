@@ -13,6 +13,7 @@ import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 class ProductRepository @Inject constructor(
@@ -30,41 +31,46 @@ class ProductRepository @Inject constructor(
         val message: String
     )
 
-    suspend fun getProducts(): List<Product> {
+    suspend fun getProducts(): Result<List<Product>> {
         val token = sharedPreferences.getString(TOKEN_KEY, null)
         return withContext(Dispatchers.IO) {
             if (token != null) {
                 try {
                     val response = client.get("products") {
                         header("Authorization", "Bearer $token")
-                        // Solicitamos más productos y los ordenamos por los más recientes primero
                         parameter("per_page", "100")
                         parameter("sort", "-created_at")
                     }
                     val responseText = response.bodyAsText()
-                    println("Full Response: $responseText")
+                    Log.d("ProductRepository", "Response: $responseText")
+
                     if (response.status.value == 200) {
-                        response.body<ProductResponse>().data
+                        Result.success(response.body<ProductResponse>().data)
+                    } else if (response.status.value == 403) {
+                        Result.failure(Exception("Sin permisos: Su rol no permite ver productos"))
                     } else {
-                        val error = response.body<ErrorResponse>()
-                        if (!error.success && error.message == "Unauthenticated.") {
-                            // Desloguear al usuario si el token venció
+                        // Intentar parsear el mensaje de error del servidor
+                        val errorMessage = try {
+                            val error = Json.decodeFromString<ErrorResponse>(responseText)
+                            error.message
+                        } catch (e: Exception) {
+                            "Error del servidor (${response.status.value})"
+                        }
+
+                        if (errorMessage == "Unauthenticated.") {
                             with(sharedPreferences.edit()) {
                                 remove(TOKEN_KEY)
                                 apply()
                             }
-                            emptyList() // Retorna lista vacía para evitar crash
-                        } else {
-                            throw Exception("Error: ${error.message}")
                         }
+                        Result.failure(Exception(errorMessage))
                     }
                 } catch (e: Exception) {
-                    println("Error fetching products: ${e.message}")
-                    emptyList() // Manejo seguro de errores
+                    Log.e("ProductRepository", "Error: ${e.message}")
+                    Result.failure(e)
                 }
             } else {
-                Log.d("ProductRepository", "getProducts: - No hay token lista vacia")
-                emptyList() // Si no hay token, retorna lista vacía
+                Result.failure(Exception("No autenticado"))
             }
         }
     }

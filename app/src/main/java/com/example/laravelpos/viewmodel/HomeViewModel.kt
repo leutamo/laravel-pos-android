@@ -90,10 +90,20 @@ class HomeViewModel @Inject constructor(
 
     fun fetchProducts() {
         viewModelScope.launch {
+            _isLoading.value = true
+            _apiError.value = null
             Log.d(TAG, "fetchProducts: Fetching products from repository...")
-            val productList = repository.getProducts()
-            Log.d(TAG, "Server responded with ${productList.size} products")
-            _products.value = productList
+            val result = repository.getProducts()
+            
+            result.onSuccess { productList ->
+                Log.d(TAG, "Server responded with ${productList.size} products")
+                _products.value = productList
+            }.onFailure { exception ->
+                Log.e(TAG, "Error fetching products: ${exception.message}")
+                _apiError.value = exception.message
+                _products.value = emptyList()
+            }
+            _isLoading.value = false
         }
     }
 

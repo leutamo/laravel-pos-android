@@ -76,7 +76,10 @@ private const val TAG = "HomeScreen"
 fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
     val viewModel: LoginViewModel = hiltViewModel()
     val userName by viewModel.userName.collectAsState()
+    val userRole by viewModel.userRole.collectAsState()
     val filteredProducts by homeViewModel.filteredProducts.collectAsState()
+    val apiError by homeViewModel.apiError.collectAsState()
+    val isLoading by homeViewModel.isLoading.collectAsState()
 
     val cartItems by homeViewModel.cartItems.collectAsState()
     val cartItemCount = cartItems.size
@@ -122,9 +125,18 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 if (userName != null) {
                     Text(
                         text = "Usuario: $userName",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (userRole != null) {
+                    Text(
+                        text = "Rol: $userRole",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                     )
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -304,17 +316,19 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                             }
                         }
                     }
-                    if (filteredProducts.isEmpty()) {
+                    if (filteredProducts.isEmpty() && !isLoading) {
                         item(span = { GridItemSpan(2) }) {
                             Column(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize().padding(top = 100.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(
-                                    text = "No products found",
+                                    text = apiError ?: "No se encontraron productos",
                                     modifier = Modifier.padding(16.dp),
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (apiError != null) Color.Red else Color.Gray,
+                                    textAlign = TextAlign.Center
                                 )
                                 Button(onClick = { homeViewModel.fetchProducts() }) {
                                     Text("Actualizar")

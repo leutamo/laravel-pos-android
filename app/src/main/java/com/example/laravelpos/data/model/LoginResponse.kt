@@ -1,5 +1,6 @@
 package com.example.laravelpos.data.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -18,22 +19,50 @@ data class Data(
 @Serializable
 data class User(
     val id: Int,
-    val first_name: String,
-    val last_name: String,
+    @SerialName("first_name") val firstName: String,
+    @SerialName("last_name") val lastName: String? = null,
     val email: String,
     val phone: String? = null,
-    val email_verified_at: String? = null,
-    val created_at: String,
-    val updated_at: String,
+    @SerialName("email_verified_at") val emailVerifiedAt: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String,
     val status: Int,
     val language: String,
-    val image_url: String,
-    val media: List<Media> = emptyList()
+    @SerialName("image_url") val imageUrl: String,
+    val media: List<Media> = emptyList(),
+    val role: List<Role> = emptyList()
+)
+
+@Serializable
+data class Role(
+    val id: Int,
+    val name: String,
+    @SerialName("display_name") val displayName: String? = null
 )
 
 @Serializable
 data class Media(
-    val id: Int? = null, // Opcional si no siempre está presente
-    val url: String? = null, // Ajusta según la estructura real
-    // Agrega otros campos según la estructura de media
+    val id: Int? = null,
+    val url: String? = null
+)
+
+@Serializable
+data class UserProfileResponse(
+    val data: UserProfileData
+)
+
+@Serializable
+data class UserProfileData(
+    val type: String,
+    val id: Int,
+    val attributes: UserAttributes
+)
+
+@Serializable
+data class UserAttributes(
+    @SerialName("first_name") val firstName: String,
+    @SerialName("last_name") val lastName: String? = null,
+    val email: String,
+    val phone: String? = null,
+    val role: List<Role> = emptyList()
 )

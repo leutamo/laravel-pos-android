@@ -2,6 +2,7 @@ package com.example.laravelpos.viewmodel
 
 // viewmodel/LoginViewModel.kt
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.LoginRequest
@@ -39,8 +40,35 @@ class LoginViewModel @Inject constructor(
     private val _userName = MutableStateFlow<String?>(repository.getUserName())
     val userName: StateFlow<String?> = _userName
 
+    private val _userRole = MutableStateFlow<String?>(repository.getUserRole())
+    val userRole: StateFlow<String?> = _userRole
+
     private val _isAuthenticated = MutableStateFlow(sharedPreferences.getString(TOKEN_KEY, null) != null)
     val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
+
+    init {
+        // Al iniciar, si está autenticado, refrescamos el perfil para tener el rol actualizado
+        if (isLoggedIn()) {
+            refreshProfile()
+        }
+    }
+
+    fun refreshProfile() {
+        Log.d("LoginViewModel", "refreshProfile: Starting...")
+        viewModelScope.launch {
+            try {
+                val success = repository.fetchProfile()
+                Log.d("LoginViewModel", "refreshProfile: Fetch result: $success")
+                if (success) {
+                    _userName.value = repository.getUserName()
+                    _userRole.value = repository.getUserRole()
+                    Log.d("LoginViewModel", "refreshProfile: User info updated. Name: ${_userName.value}, Role: ${_userRole.value}")
+                }
+            } catch (e: Exception) {
+                Log.e("LoginViewModel", "refreshProfile: Error: ${e.message}", e)
+            }
+        }
+    }
 
     fun login(email: String, password: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
@@ -49,7 +77,7 @@ class LoginViewModel @Inject constructor(
                 val response = repository.login(LoginRequest(email, password))
                 if (response.data != null) {
                     response.data.let {
-                        _userName.value = it.user.first_name
+                        _userName.value = it.user.firstName
                         onSuccess()
                     } ?: run {
                         _state.value = LoginState(error = "No data in response")
