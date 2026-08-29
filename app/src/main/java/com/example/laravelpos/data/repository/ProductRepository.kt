@@ -34,7 +34,7 @@ class ProductRepository @Inject constructor(
         return withContext(Dispatchers.IO) {
             if (token != null) {
                 try {
-                    val response = client.get("http://192.168.100.68:8000/api/products") {
+                    val response = client.get("products") {
                         header("Authorization", "Bearer $token")
                     }
                     val responseText = response.bodyAsText()

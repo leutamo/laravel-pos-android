@@ -39,7 +39,7 @@ class DocumentTypeRepository @Inject constructor(
         }
 
         return@withContext try {
-            val response = client.get("http://192.168.100.68:8000/api/document-types") {
+            val response = client.get("document-types") {
                 header("Authorization", "Bearer $token")
             }
 

@@ -19,7 +19,7 @@ class LoginRepository @Inject constructor(
 ) {
     suspend fun login(request: LoginRequest): LoginResponse {
         return try {
-            val response: LoginResponse = httpClient.post("http://192.168.100.68:8000/api/login") {
+            val response: LoginResponse = httpClient.post("login") {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }.body()

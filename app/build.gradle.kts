@@ -19,6 +19,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Centralización de la IP del servidor (definida en gradle.properties)
+        val serverIp: String = project.findProperty("serverIp") as? String ?: "127.0.0.1"
+        buildConfigField("String", "SERVER_IP", "\"$serverIp\"")
+        buildConfigField("String", "BASE_URL", "\"http://$serverIp:8000/api/\"")
     }
 
     buildTypes {

@@ -186,7 +186,7 @@ class QuotationRepository @Inject constructor(
         return withContext(Dispatchers.IO) {
             if (token != null) {
                 try {
-                    val response = client.post("http://192.168.100.68:8000/api/quotations") {
+                    val response = client.post("quotations") {
                         header("Authorization", "Bearer $token")
                         contentType(ContentType.Application.Json)
                         setBody(request)

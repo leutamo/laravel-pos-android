@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.LoginRequest
 import com.example.laravelpos.data.repository.LoginRepository
 import com.example.laravelpos.data.repository.ProductRepository.Companion.TOKEN_KEY
+import com.example.laravelpos.data.config.ServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,11 +23,18 @@ data class LoginState(
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val repository: LoginRepository,
-    private val sharedPreferences: SharedPreferences
+    private val sharedPreferences: SharedPreferences,
+    private val serverConfig: ServerConfig
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginState())
     val state: StateFlow<LoginState> = _state
+
+    fun getServerIp() = serverConfig.getServerIp()
+
+    fun updateServerIp(ip: String) {
+        serverConfig.setServerIp(ip)
+    }
 
     private val _userName = MutableStateFlow<String?>(repository.getUserName())
     val userName: StateFlow<String?> = _userName
