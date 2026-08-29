@@ -1,6 +1,7 @@
 package com.example.laravelpos.data.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
 
 @Serializable
 data class ProductResponse(
@@ -39,7 +40,8 @@ data class ProductAttributes(
     val order_tax: Int,
     val tax_type: String,
     val notes: String?,
-    val images: List<String>, // Podría ser una lista vacía o más compleja, ajusta según necesites
+    @Serializable(with = ProductImagesSerializer::class)
+    val images: ProductImages? = null,
     val product_category_name: String,
     val brand_name: String,
     val barcode_image_url: String,
@@ -52,8 +54,27 @@ data class ProductAttributes(
     val warehouse: List<Warehouse>,
     val barcode_url: String,
     val in_stock: Int,
-    val variation_product: VariationProduct? = null // Opcional, ya que no todos los productos lo tienen
+    val variation_product: VariationProduct? = null
 )
+
+@Serializable
+data class ProductImages(
+    val imageUrls: List<String> = emptyList(),
+    val id: List<Int> = emptyList()
+)
+
+object ProductImagesSerializer : JsonTransformingSerializer<ProductImages>(ProductImages.serializer()) {
+    override fun transformDeserialize(element: JsonElement): JsonElement {
+        // El servidor Laravel es inconsistente:
+        // Devuelve [] (JsonArray) cuando no hay imágenes.
+        // Devuelve {"imageUrls": [...]} (JsonObject) cuando sí las hay.
+        return if (element is JsonArray && element.isEmpty()) {
+            JsonObject(emptyMap())
+        } else {
+            element
+        }
+    }
+}
 
 @Serializable
 data class UnitName(

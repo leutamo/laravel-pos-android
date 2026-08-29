@@ -237,7 +237,7 @@ fun CartItemCard(product: Product, homeViewModel: HomeViewModel) {
         ) {
             // Imagen del producto
             AsyncImage(
-                model = product.attributes.images.firstOrNull() ?: "",
+                model = homeViewModel.getFullImageUrl(product.attributes.images?.imageUrls?.firstOrNull()),
                 contentDescription = product.attributes.name,
                 modifier = Modifier.size(60.dp)
             )

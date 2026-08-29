@@ -8,6 +8,7 @@ import com.example.laravelpos.data.repository.ProductRepository
 import com.example.laravelpos.data.repository.QuotationItem
 import com.example.laravelpos.data.repository.QuotationRepository
 import com.example.laravelpos.data.repository.QuotationRequest
+import com.example.laravelpos.data.config.ServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,10 +29,19 @@ private const val TAG = "HomeViewModel"
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: ProductRepository,
-    private val quotationRepository: QuotationRepository
+    private val quotationRepository: QuotationRepository,
+    private val serverConfig: ServerConfig
 ) : ViewModel() {
     private val _products = MutableStateFlow<List<Product>>(emptyList())
     val products: StateFlow<List<Product>> = _products.asStateFlow()
+
+    fun getFullImageUrl(relativePath: String?): String {
+        val fullUrl = serverConfig.getFullImageUrl(relativePath)
+        if (!relativePath.isNullOrBlank()) {
+            Log.d(TAG, "Generating image URL: $fullUrl (from original: $relativePath)")
+        }
+        return fullUrl
+    }
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery

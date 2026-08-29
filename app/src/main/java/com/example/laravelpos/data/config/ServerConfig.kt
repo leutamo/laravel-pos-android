@@ -26,4 +26,22 @@ class ServerConfig @Inject constructor(
         val ip = getServerIp()
         return "http://$ip:$DEFAULT_PORT/api/"
     }
+
+    fun getFullImageUrl(relativePath: String?): String {
+        if (relativePath.isNullOrBlank()) return ""
+        
+        val ip = getServerIp()
+        
+        // Si el servidor ya devuelve una URL completa (http...)
+        if (relativePath.startsWith("http")) {
+            // Reemplazamos 127.0.0.1 o localhost por la IP real configurada
+            // ya que el servidor suele devolver su propia dirección local.
+            return relativePath
+                .replace("127.0.0.1", ip)
+                .replace("localhost", ip)
+        }
+        
+        // Si es una ruta relativa, asumimos la estructura de Laravel
+        return "http://$ip:$DEFAULT_PORT/storage/$relativePath"
+    }
 }

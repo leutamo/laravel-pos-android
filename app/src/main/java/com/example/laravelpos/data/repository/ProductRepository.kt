@@ -9,6 +9,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
@@ -36,6 +37,9 @@ class ProductRepository @Inject constructor(
                 try {
                     val response = client.get("products") {
                         header("Authorization", "Bearer $token")
+                        // Solicitamos más productos y los ordenamos por los más recientes primero
+                        parameter("per_page", "100")
+                        parameter("sort", "-created_at")
                     }
                     val responseText = response.bodyAsText()
                     println("Full Response: $responseText")
