@@ -34,8 +34,8 @@ data class CustomerAttributes(
     val document_type_id: Int,
 
     // Campos de marca de tiempo (timestamps) de la API
-    val created_at: String,
-    val updated_at: String
+    val created_at: String? = null,
+    val updated_at: String? = null
 )
 
 // Representa los enlaces de la API, si los hay.

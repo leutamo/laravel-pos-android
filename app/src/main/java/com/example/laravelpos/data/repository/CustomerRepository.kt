@@ -10,12 +10,17 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import javax.inject.Inject
 
 private const val TAG = "CustomerRepository"
@@ -34,13 +39,29 @@ data class DataWrapper<T>(
     val data: T
 )
 
+@Serializable
+data class CustomerCreateRequest(
+    val name: String,
+    val email: String,
+    val phone: String,
+    val country: String,
+    val city: String,
+    val address: String,
+    @SerialName("document_number") val documentNumber: String,
+    @SerialName("document_type_id") val documentTypeId: Int
+)
+
+sealed class CustomerResult {
+    data class Success(val customer: Customer) : CustomerResult()
+    data class Error(val message: String) : CustomerResult()
+}
+
 class CustomerRepository @Inject constructor(
     private val client: HttpClient,
     private val sharedPreferences: SharedPreferences
 ) {
     /**
      * Busca un cliente por su número de documento.
-     * Endpoint: GET /api/customers/search/{document_number}
      */
     suspend fun searchCustomer(documentNumber: String): Customer? {
         val token = sharedPreferences.getString(TOKEN_KEY, null)
@@ -50,8 +71,6 @@ class CustomerRepository @Inject constructor(
                     header("Authorization", "Bearer $token")
                 }
                 if (response.status.isSuccess()) {
-                    // El backend usa sendResponse(new CustomerResource($customer))
-                    // Estructura: { "success": true, "data": { "data": { ... } }, "message": "..." }
                     val result = response.body<LaravelResponse<DataWrapper<Customer>>>()
                     result.data.data
                 } else {
@@ -66,40 +85,53 @@ class CustomerRepository @Inject constructor(
 
     /**
      * Crea un nuevo cliente.
-     * Endpoint: POST /api/customers
      */
-    suspend fun createCustomer(customer: Customer): Customer? {
+    suspend fun createCustomer(customer: Customer): CustomerResult {
         val token = sharedPreferences.getString(TOKEN_KEY, null)
         return withContext(Dispatchers.IO) {
             try {
-                // Laravel espera campos planos en CreateCustomerRequest
-                val payload = mapOf(
-                    "name" to customer.attributes.name,
-                    "email" to customer.attributes.email,
-                    "phone" to customer.attributes.phone,
-                    "country" to customer.attributes.country,
-                    "city" to customer.attributes.city,
-                    "address" to customer.attributes.address,
-                    "document_number" to customer.attributes.document_number,
-                    "document_type_id" to customer.attributes.document_type_id.toString()
+                val request = CustomerCreateRequest(
+                    name = customer.attributes.name,
+                    email = customer.attributes.email,
+                    phone = customer.attributes.phone,
+                    country = customer.attributes.country,
+                    city = customer.attributes.city,
+                    address = customer.attributes.address,
+                    documentNumber = customer.attributes.document_number,
+                    documentTypeId = customer.attributes.document_type_id
                 )
                 
                 val response = client.post("customers") {
                     header("Authorization", "Bearer $token")
                     contentType(ContentType.Application.Json)
-                    setBody(payload)
+                    setBody(request)
                 }
                 
+                val responseText = response.bodyAsText()
+                Log.d(TAG, "Create Customer Response: $responseText")
+
                 if (response.status.isSuccess()) {
-                    // store() en Laravel devuelve el recurso directamente -> { "data": { ... } }
                     val result = response.body<DataWrapper<Customer>>()
-                    result.data
+                    CustomerResult.Success(result.data)
                 } else {
-                    null
+                    val errorMessage = try {
+                        val json = Json.parseToJsonElement(responseText).jsonObject
+                        val message = json["message"]?.toString()?.removeSurrounding("\"") ?: "Error desconocido"
+                        val errors = json["errors"]?.jsonObject
+                        if (errors != null) {
+                            val firstError = errors.values.firstOrNull()?.jsonArray?.firstOrNull()?.toString()?.removeSurrounding("\"")
+                            if (firstError != null) "$message: $firstError" else message
+                        } else {
+                            message
+                        }
+                    } catch (e: Exception) {
+                        "Error del servidor (${response.status.value})"
+                    }
+                    CustomerResult.Error(errorMessage)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error creating customer: ${e.message}")
-                null
+                CustomerResult.Error(e.message ?: "Error de conexión")
             }
         }
     }

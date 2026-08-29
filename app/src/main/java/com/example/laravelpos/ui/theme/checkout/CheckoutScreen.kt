@@ -16,8 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,6 +31,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -40,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -151,7 +153,7 @@ fun CheckoutScreen(
                         homeViewModel.selectReceiptType(null)
                     }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Regresar"
                         )
                     }
@@ -214,14 +216,14 @@ fun CheckoutScreen(
                 ) {
                     OutlinedTextField(
                         readOnly = true,
-                        value = selectedDocType ?: "Seleccionar tipo de documento",
+                        value = selectedDocType?.name ?: "Seleccionar tipo de documento",
                         onValueChange = { },
                         label = { Text("Tipo") },
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                         },
                         modifier = Modifier
-                            .menuAnchor()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             .fillMaxWidth()
                     )
                     ExposedDropdownMenu(
@@ -232,7 +234,7 @@ fun CheckoutScreen(
                             DropdownMenuItem(
                                 text = { Text(type.name) },
                                 onClick = {
-                                    checkoutViewModel.updateSelectedDocumentType(type.name) // Usamos name en lugar de code
+                                    checkoutViewModel.updateSelectedDocumentType(type) // ✅ Enviamos el objeto completo
                                     expanded = false
                                 }
                             )
@@ -248,7 +250,7 @@ fun CheckoutScreen(
                     OutlinedTextField(
                         value = dniText,
                         onValueChange = { checkoutViewModel.updateDni(it) }, // ✅ Actualiza en ViewModel
-                        label = { Text(selectedDocType ?: "DNI/RUC") },
+                        label = { Text(selectedDocType?.name ?: "DNI/RUC") },
                         modifier = Modifier.weight(1f),
                         enabled = isDniFieldEnabled && !isLoadingCustomer // Bloqueo hasta seleccionar tipo y durante carga
                     )
@@ -380,88 +382,109 @@ fun CheckoutScreen(
                 }
             }
 
-            // ✅ Modal para crear nuevo cliente TODO: Validar campos hardcodeados
+            // ✅ Modal para crear nuevo cliente
             if (showCreateCustomerDialog) {
-                var name by remember { mutableStateOf("walk-in-customer") }
-                var email by remember { mutableStateOf("customer@infypos.com") }
-                var phone by remember { mutableStateOf("123456789") }
-                var country by remember { mutableStateOf("india") }
-                var city by remember { mutableStateOf("mumbai") }
-                var address by remember { mutableStateOf("Dr Deshmukh Marg , mumbai") }
-                var documentNumber by remember { mutableStateOf("123456") }
-                var documentTypeId by remember { mutableStateOf(1) }
+                var name by remember { mutableStateOf("") }
+                var email by remember { mutableStateOf("") }
+                var phone by remember { mutableStateOf("") }
+                var country by remember { mutableStateOf("Perú") }
+                var city by remember { mutableStateOf("Lima") }
+                var address by remember { mutableStateOf("") }
+                var documentNumber by remember { mutableStateOf(dniText) }
+                var documentTypeId by remember { mutableIntStateOf(selectedDocType?.id ?: 1) }
+                var selectedDocTypeName by remember { mutableStateOf(selectedDocType?.name ?: "DNI") }
+                var docTypeExpanded by remember { mutableStateOf(false) }
 
                 AlertDialog(
                     onDismissRequest = { showCreateCustomerDialog = false },
                     title = { Text("Crear Nuevo Cliente") },
                     text = {
                         Column {
+                            ExposedDropdownMenuBox(
+                                expanded = docTypeExpanded,
+                                onExpandedChange = { docTypeExpanded = it },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                OutlinedTextField(
+                                    readOnly = true,
+                                    value = selectedDocTypeName,
+                                    onValueChange = { },
+                                    label = { Text("Tipo de Documento *") },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = docTypeExpanded)
+                                    },
+                                    modifier = Modifier
+                                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                        .fillMaxWidth()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = docTypeExpanded,
+                                    onDismissRequest = { docTypeExpanded = false }
+                                ) {
+                                    documentTypes.forEach { type ->
+                                        DropdownMenuItem(
+                                            text = { Text(type.name) },
+                                            onClick = {
+                                                documentTypeId = type.id
+                                                selectedDocTypeName = type.name
+                                                docTypeExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = documentNumber,
+                                onValueChange = { documentNumber = it },
+                                label = { Text("Número de Documento *") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = name,
                                 onValueChange = { name = it },
-                                label = { Text("Nombre") },
+                                label = { Text("Nombre Completo *") },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = email,
                                 onValueChange = { email = it },
-                                label = { Text("Email") },
-                                modifier = Modifier.fillMaxWidth()
+                                label = { Text("Email *") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = phone,
                                 onValueChange = { phone = it },
-                                label = { Text("Teléfono") },
+                                label = { Text("Teléfono *") },
                                 modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = country,
-                                onValueChange = { country = it },
-                                label = { Text("País") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = city,
-                                onValueChange = { city = it },
-                                label = { Text("Ciudad") },
-                                modifier = Modifier.fillMaxWidth()
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = address,
                                 onValueChange = { address = it },
-                                label = { Text("Dirección") },
+                                label = { Text("Dirección *") },
                                 modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = documentNumber,
-                                onValueChange = { documentNumber = it },
-                                label = { Text("Número de Documento") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = documentTypeId.toString(),
-                                onValueChange = { documentTypeId = it.toIntOrNull() ?: 1 },
-                                label = { Text("ID Tipo de Documento") },
-                                modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                             )
                         }
                     },
                     confirmButton = {
                         Button(
                             onClick = {
+                                if (name.isBlank() || email.isBlank() || phone.isBlank()) {
+                                    Toast.makeText(context, "Por favor complete los campos obligatorios", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+
                                 val currentTime = java.time.OffsetDateTime.now().toString()
                                 val newCustomer = Customer(
                                     type = "customers",
-                                    id = 0, // Placeholder, la API asignará el ID real
+                                    id = 0,
                                     attributes = CustomerAttributes(
                                         name = name,
                                         email = email,
@@ -475,11 +498,8 @@ fun CheckoutScreen(
                                         created_at = currentTime,
                                         updated_at = currentTime
                                     ),
-                                    links = CustomerLinks(
-                                        self = "http://localhost:8000/api/customers/2" // Placeholder
-                                    )
+                                    links = CustomerLinks(self = "")
                                 )
-                                // Usamos la nueva función del ViewModel
                                 checkoutViewModel.createCustomer(newCustomer)
                                 showCreateCustomerDialog = false
                             }

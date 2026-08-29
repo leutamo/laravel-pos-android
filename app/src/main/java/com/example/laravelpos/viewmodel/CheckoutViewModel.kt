@@ -4,17 +4,16 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.Customer
-import com.example.laravelpos.data.model.CustomerAttributes
 import com.example.laravelpos.data.model.CustomerLinks
 import com.example.laravelpos.data.model.DocumentType
 import com.example.laravelpos.data.model.Product
 import com.example.laravelpos.data.model.QuotationItem
 import com.example.laravelpos.data.model.QuotationRequest
 import com.example.laravelpos.data.repository.CustomerRepository
+import com.example.laravelpos.data.repository.CustomerResult
 import com.example.laravelpos.data.repository.DocumentTypeRepository
 import com.example.laravelpos.data.repository.QuotationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -25,7 +24,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.time.OffsetDateTime
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -41,9 +39,9 @@ class CheckoutViewModel @Inject constructor(
     private val _documentTypes = MutableStateFlow<List<DocumentType>>(emptyList())
     val documentTypes: StateFlow<List<DocumentType>> = _documentTypes.asStateFlow()
 
-    // ✅ ESTADO PARA EL TIPO DE DOCUMENTO SELECCIONADO
-    private val _selectedDocumentType = MutableStateFlow<String?>(null)
-    val selectedDocumentType: StateFlow<String?> = _selectedDocumentType.asStateFlow()
+    // ✅ ESTADO PARA EL TIPO DE DOCUMENTO SELECCIONADO (Objeto completo)
+    private val _selectedDocumentType = MutableStateFlow<DocumentType?>(null)
+    val selectedDocumentType: StateFlow<DocumentType?> = _selectedDocumentType.asStateFlow()
 
     // ✅ NUEVO: Estado para controlar si el campo DNI está habilitado
     private val _isDniFieldEnabled = MutableStateFlow(false)
@@ -70,7 +68,7 @@ class CheckoutViewModel @Inject constructor(
     private val _pagoContado = MutableStateFlow(true)
     val pagoContado: StateFlow<Boolean> = _pagoContado.asStateFlow()
 
-    // ✅ FUNCIÓN CORREGIDA — ¡IMPLEMENTADA!
+    // ✅ Cargar tipos de documento
     fun loadDocumentTypes() {
         viewModelScope.launch {
             _isLoadingDocumentTypes.value = true
@@ -86,42 +84,46 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
-    // ✅ NUEVA FUNCIÓN: Para actualizar el tipo de documento seleccionado
-    fun updateSelectedDocumentType(type: String?) {
-        Log.d("CheckoutViewModel", "Actualizando tipo de documento a: $type")
+    // ✅ Actualizar tipo de documento seleccionado
+    fun updateSelectedDocumentType(type: DocumentType?) {
+        Log.d("CheckoutViewModel", "Actualizando tipo de documento a: ${type?.name}")
         _selectedDocumentType.value = type
-        _isDniFieldEnabled.value = type != null // Habilita el campo DNI solo si hay un tipo seleccionado
+        _isDniFieldEnabled.value = type != null
     }
-    // Nueva función para crear un cliente
+
+    // ✅ Crear cliente real usando el repositorio mejorado
     fun createCustomer(customer: Customer) {
         viewModelScope.launch {
             _isLoadingCustomer.value = true
             try {
-                val createdCustomer = customerRepository.createCustomer(customer)
-                if (createdCustomer != null) {
-                    _customerData.value = createdCustomer
-                    _toastEvent.emit("Cliente creado: ${createdCustomer.attributes.name}")
-                } else {
-                    _toastEvent.emit("Error al crear cliente en el servidor")
+                when (val result = customerRepository.createCustomer(customer)) {
+                    is CustomerResult.Success -> {
+                        _customerData.value = result.customer
+                        _toastEvent.emit("Cliente creado exitosamente")
+                    }
+                    is CustomerResult.Error -> {
+                        _toastEvent.emit(result.message)
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("CheckoutViewModel", "Error al crear cliente: ${e.message}")
-                _toastEvent.emit("Error al crear cliente: ${e.message}")
+                Log.e("CheckoutViewModel", "Error inesperado al crear cliente: ${e.message}")
+                _toastEvent.emit("Error inesperado: ${e.message}")
             } finally {
                 _isLoadingCustomer.value = false
             }
         }
     }
 
-    // ✅ LÓGICA PRINCIPAL (INIT) - Búsqueda real en la base de datos
+    // ✅ Búsqueda real de clientes en el backend
     init {
         viewModelScope.launch {
             combine(dniText.debounce(500), selectedDocumentType) { dni, docType ->
                 Pair(dni, docType)
             }.collect { (dni, docType) ->
-                val requiredLength = when (docType) {
+                val requiredLength = when (docType?.name) {
                     "DNI" -> 8
                     "RUC" -> 11
+                    "CARNET EXT." -> 12 // Ajustar según sea necesario
                     else -> 0
                 }
 
@@ -173,20 +175,15 @@ class CheckoutViewModel @Inject constructor(
         cartItems: List<Product>,
         itemQuantities: Map<String, Int>
     ) {
-        // Obtenemos el cliente seleccionado. 
-        // Si no hay uno, usamos el ID 6 como cliente de prueba (según plataforma web)
         val customerId = _customerData.value?.id ?: 6 
 
         viewModelScope.launch {
             _isLoading.value = true
             _apiError.value = null
             try {
-                // 1. Mapear items del carrito al formato de Cotización
                 val quotationItems = cartItems.map { product ->
                     val quantity = itemQuantities[product.id.toString()] ?: 0
                     val subTotal = product.attributes.product_price * quantity
-                    
-                    // Ajuste de impuestos (IGV 18%) similar a HomeViewModel
                     val netUnitPrice = product.attributes.product_price / 1.18
                     val taxAmount = subTotal - (netUnitPrice * quantity)
 
@@ -195,7 +192,7 @@ class CheckoutViewModel @Inject constructor(
                         quantity = quantity,
                         productPrice = String.format("%.2f", product.attributes.product_price),
                         netUnitPrice = String.format("%.2f", netUnitPrice),
-                        taxType = 1, // Gravado
+                        taxType = 1,
                         taxValue = "18.00",
                         taxAmount = String.format("%.2f", taxAmount),
                         discountType = 2,
@@ -206,19 +203,15 @@ class CheckoutViewModel @Inject constructor(
                     )
                 }
 
-                // 2. Formatear fecha ISO
                 val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
                 val currentDate = isoFormat.format(Date())
-
-                // 3. Calcular impuestos totales
                 val totalIgv = totalAmount - (totalAmount / 1.18)
 
-                // 4. Construir el Request (Payload igual al de la plataforma web)
                 val request = QuotationRequest(
                     date = currentDate,
                     customerId = customerId,
                     warehouseId = 1, 
-                    status = 1, // Enviado
+                    status = 1,
                     taxRate = "18.00",
                     taxAmount = String.format("%.2f", totalIgv),
                     discount = "0.00",
@@ -230,11 +223,9 @@ class CheckoutViewModel @Inject constructor(
                     quotationItems = quotationItems
                 )
 
-                // 5. Llamar al repositorio
                 val result = quotationRepository.createQuotation(request)
 
                 if (result.success) {
-                    Log.d("CheckoutViewModel", "Cotización creada ID: ${result.data?.id}")
                     _toastEvent.emit("Cotización realizada con éxito")
                     _navigateToSummary.value = result.data?.id.toString()
                 } else {
