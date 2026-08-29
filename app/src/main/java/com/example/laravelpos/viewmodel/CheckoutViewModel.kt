@@ -128,23 +128,27 @@ class CheckoutViewModel @Inject constructor(
                 }
 
                 if (dni.length == requiredLength && requiredLength > 0) {
-                    _isLoadingCustomer.value = true
-                    try {
-                        val customer = customerRepository.searchCustomer(dni)
-                        if (customer != null) {
-                            _customerData.value = customer
-                            _toastEvent.emit("Cliente encontrado: ${customer.attributes.name}")
-                        } else {
-                            _customerData.value = null
-                            _toastEvent.emit("Cliente no registrado")
+                    // Solo buscamos si el DNI es diferente al del cliente ya cargado
+                    // para evitar bucles o sobreescritura al usar el botón "Genérico"
+                    if (_customerData.value?.attributes?.document_number != dni) {
+                        _isLoadingCustomer.value = true
+                        try {
+                            val customer = customerRepository.searchCustomer(dni)
+                            if (customer != null) {
+                                _customerData.value = customer
+                                _toastEvent.emit("Cliente encontrado: ${customer.attributes.name}")
+                            } else {
+                                _customerData.value = null
+                                _toastEvent.emit("Cliente no registrado")
+                            }
+                        } catch (e: Exception) {
+                            Log.e("CheckoutViewModel", "Error al buscar cliente: ${e.message}")
+                            _toastEvent.emit("Error en la búsqueda")
+                        } finally {
+                            _isLoadingCustomer.value = false
                         }
-                    } catch (e: Exception) {
-                        Log.e("CheckoutViewModel", "Error al buscar cliente: ${e.message}")
-                        _toastEvent.emit("Error en la búsqueda")
-                    } finally {
-                        _isLoadingCustomer.value = false
                     }
-                } else {
+                } else if (dni.isEmpty()) {
                     _customerData.value = null
                 }
             }
@@ -154,6 +158,40 @@ class CheckoutViewModel @Inject constructor(
     // Funciones para actualizar
     fun updateDni(text: String) { _dniText.value = text }
     fun updatePagoContado(isContado: Boolean) { _pagoContado.value = isContado }
+
+    /**
+     * Selecciona al primer cliente de la base de datos como cliente genérico
+     */
+    fun selectGenericCustomer() {
+        viewModelScope.launch {
+            _isLoadingCustomer.value = true
+            try {
+                val customer = customerRepository.getFirstCustomer()
+                if (customer != null) {
+                    Log.d("CheckoutViewModel", "Cliente genérico obtenido: ${customer.attributes.name}")
+                    
+                    // Buscamos el tipo de documento correspondiente en nuestra lista PRIMERO
+                    val docType = _documentTypes.value.find { it.id == customer.attributes.document_type_id }
+                    
+                    // ✅ USAMOS LA FUNCIÓN para que se habilite el campo DNI automáticamente
+                    updateSelectedDocumentType(docType)
+                    
+                    // Luego el DNI y el objeto completo
+                    _dniText.value = customer.attributes.document_number
+                    _customerData.value = customer
+
+                    _toastEvent.emit("Cliente genérico seleccionado: ${customer.attributes.name}")
+                } else {
+                    _toastEvent.emit("No hay un cliente genérico asignado")
+                }
+            } catch (e: Exception) {
+                Log.e("CheckoutViewModel", "Error al seleccionar cliente genérico: ${e.message}")
+                _toastEvent.emit("Error al obtener cliente genérico")
+            } finally {
+                _isLoadingCustomer.value = false
+            }
+        }
+    }
 
     // Estado para errores y navegación
     private val _apiError = MutableStateFlow<String?>(null)

@@ -3,6 +3,7 @@ package com.example.laravelpos.data.repository
 import android.content.SharedPreferences
 import android.util.Log
 import com.example.laravelpos.data.model.Customer
+import com.example.laravelpos.data.model.CustomerResponse
 import com.example.laravelpos.data.repository.ProductRepository.Companion.TOKEN_KEY
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -78,6 +79,30 @@ class CustomerRepository @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error searching customer: ${e.message}")
+                null
+            }
+        }
+    }
+
+    /**
+     * Obtiene el primer cliente registrado (considerado genérico para esta etapa)
+     */
+    suspend fun getFirstCustomer(): Customer? {
+        val token = sharedPreferences.getString(TOKEN_KEY, null)
+        return withContext(Dispatchers.IO) {
+            try {
+                // Solicitamos la lista de clientes, limitada a 1 para eficiencia
+                val response = client.get("customers?page[size]=1") {
+                    header("Authorization", "Bearer $token")
+                }
+                if (response.status.isSuccess()) {
+                    val result = response.body<CustomerResponse>()
+                    result.data.firstOrNull()
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching first customer: ${e.message}")
                 null
             }
         }

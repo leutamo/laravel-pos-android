@@ -258,7 +258,7 @@ fun CheckoutScreen(
                         enabled = isDniFieldEnabled && !isLoadingCustomer // Bloqueo hasta seleccionar tipo y durante carga
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { /* TODO: DNI genérico */ }) {
+                    Button(onClick = { checkoutViewModel.selectGenericCustomer() }) {
                         Text("Genérico")
                     }
                 }
