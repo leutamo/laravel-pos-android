@@ -46,6 +46,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.laravelpos.viewmodel.HomeViewModel
 import com.example.laravelpos.viewmodel.SummaryViewModel
+import com.example.laravelpos.viewmodel.CheckoutViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +54,8 @@ fun SummaryScreen(
     navController: NavController,
     homeViewModel: HomeViewModel,
     quotationId: Int,
-    summaryViewModel: SummaryViewModel = hiltViewModel()
+    summaryViewModel: SummaryViewModel = hiltViewModel(),
+    checkoutViewModel: CheckoutViewModel = hiltViewModel() // ✅ Añadido
 ) {
     val state by summaryViewModel.state.collectAsState()
     val quotation = state.quotation
@@ -217,6 +219,9 @@ fun SummaryScreen(
                         Spacer(modifier = Modifier.width(16.dp))
                         Button(
                             onClick = {
+                                checkoutViewModel.clearCheckoutData() // ✅ Limpiar datos del cliente anterior
+                                homeViewModel.clearCart() // ✅ Por si acaso
+                                homeViewModel.selectReceiptType(null)
                                 navController.navigate("home") {
                                     popUpTo("home") { inclusive = true }
                                 }

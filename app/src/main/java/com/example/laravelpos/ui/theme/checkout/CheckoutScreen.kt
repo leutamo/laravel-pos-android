@@ -110,6 +110,7 @@ fun CheckoutScreen(
     LaunchedEffect(navigateToSummary) {
         navigateToSummary?.let { id ->
             homeViewModel.clearCart() // ✅ Limpiar el carrito tras éxito
+            checkoutViewModel.clearCheckoutData() // ✅ Limpiar datos del cliente para la próxima venta
             navController.navigate("summary_screen/$id")
             checkoutViewModel.onSummaryNavigated()
         }

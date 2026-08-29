@@ -168,6 +168,19 @@ class CheckoutViewModel @Inject constructor(
     fun clearApiError() { _apiError.value = null }
     fun onSummaryNavigated() { _navigateToSummary.value = null }
 
+    /**
+     * Limpia todos los datos del checkout para una nueva venta
+     */
+    fun clearCheckoutData() {
+        _dniText.value = ""
+        _customerData.value = null
+        _selectedDocumentType.value = null
+        _isDniFieldEnabled.value = false
+        _pagoContado.value = true
+        _apiError.value = null
+        _navigateToSummary.value = null
+    }
+
     // Lógica de procesar checkout
     fun processCheckout(
         totalAmount: Double,
