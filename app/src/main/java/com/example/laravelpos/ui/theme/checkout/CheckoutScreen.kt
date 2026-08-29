@@ -5,6 +5,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -283,26 +285,41 @@ fun CheckoutScreen(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     )
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "Datos del Cliente",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = customer.attributes.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Doc: ${customer.attributes.document_number}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        if (customer.attributes.email.isNotEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
                             Text(
-                                text = "Email: ${customer.attributes.email}",
-                                style = MaterialTheme.typography.bodySmall
+                                text = "Datos del Cliente",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = customer.attributes.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Doc: ${customer.attributes.document_number}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            if (customer.attributes.email.isNotEmpty()) {
+                                Text(
+                                    text = "Email: ${customer.attributes.email}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        
+                        // ✅ Botón para quitar cliente
+                        IconButton(
+                            onClick = { checkoutViewModel.clearCustomerSelection() },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Quitar cliente",
+                                tint = Color.Gray,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }

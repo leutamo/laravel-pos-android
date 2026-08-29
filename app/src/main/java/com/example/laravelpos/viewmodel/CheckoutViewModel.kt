@@ -169,6 +169,14 @@ class CheckoutViewModel @Inject constructor(
     fun onSummaryNavigated() { _navigateToSummary.value = null }
 
     /**
+     * Limpia la selección del cliente actual para permitir una nueva búsqueda
+     */
+    fun clearCustomerSelection() {
+        _dniText.value = ""
+        _customerData.value = null
+    }
+
+    /**
      * Limpia todos los datos del checkout para una nueva venta
      */
     fun clearCheckoutData() {
