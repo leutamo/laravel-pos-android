@@ -22,20 +22,31 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +62,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.laravelpos.viewmodel.HomeViewModel
 import com.example.laravelpos.viewmodel.LoginViewModel
+import kotlinx.coroutines.launch
 
 // Se ha movido la constante TAG a nivel de archivo para evitar errores
 private const val TAG = "HomeScreen"
@@ -58,231 +70,214 @@ private const val TAG = "HomeScreen"
 @Composable
 fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
     val viewModel: LoginViewModel = hiltViewModel()
-    //val homeViewModel: HomeViewModel = hiltViewModel()
     val userName by viewModel.userName.collectAsState()
     val filteredProducts by homeViewModel.filteredProducts.collectAsState()
 
-    // Para actualizar el contador de carrito
     val cartItems by homeViewModel.cartItems.collectAsState()
     val cartItemCount = cartItems.size
 
     val isAuthenticated by viewModel.isAuthenticated.collectAsState()
 
     var searchText by remember { mutableStateOf(TextFieldValue("")) }
-    val context = LocalContext.current // Obtenemos el contexto actual
+    val context = LocalContext.current
 
-    // Redirect to login if not authenticated
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
     LaunchedEffect(isAuthenticated) {
         if (!isAuthenticated) {
             navController.navigate("login") {
                 popUpTo("home") { inclusive = true }
             }
-        }else {
-            Log.d(TAG, "User authenticated, filteredProducts size: ${filteredProducts.size}")
         }
     }
 
-    // Use WindowInsets.systemBars to handle padding for system bars
-    val systemBarPadding =
-        with(LocalDensity.current) { WindowInsets.systemBars.getBottom(this).toDp() }
-
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .padding(WindowInsets.systemBars.asPaddingValues())) {
-        // Search bar and cart Icon
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = {
-                    searchText = it
-                    homeViewModel.onSearchQueryChanged(it.text)
-                },
-                label = { Text("Buscar producto...") },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(8.dp)
-            )
-            // Shopping cart icon and counter
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .padding(start = 8.dp)
-                    .clickable {
-                        navController.navigate("cart") { // <-- Navega a "cart"
-                            // popUpTo("home") { inclusive = true } // Se comenta para no eliminar el stack
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ShoppingCart,
-                    contentDescription = "Carrito de compras",
-                    modifier = Modifier.size(28.dp)
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Laravel POS",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.titleLarge
                 )
-                // Counter overlay
-                Box(
-                    modifier = Modifier
-                        .size(16.dp)
-                        .background(Color.Red, shape = MaterialTheme.shapes.small)
-                        .align(Alignment.TopEnd)
-                ) {
+                if (userName != null) {
                     Text(
-                        text = cartItemCount.toString(), // Placeholder for cart count, se agrega contador de cartItem
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.align(Alignment.Center)
+                        text = "Usuario: $userName",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                
+                NavigationDrawerItem(
+                    label = { Text("Cerrar Sesión") },
+                    selected = false,
+                    onClick = {
+                        scope.launch {
+                            drawerState.close()
+                            viewModel.logout()
+                            navController.navigate("login") {
+                                popUpTo("home") { inclusive = true }
+                            }
+                        }
+                    },
+                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
             }
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Product grid with 2 columns
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+    ) {
+        Column(
             modifier = Modifier
-                .weight(1f)
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .fillMaxSize()
+                .padding(WindowInsets.systemBars.asPaddingValues())
         ) {
-            items(filteredProducts) { product ->
-                Card(
+            // Search bar and Icons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    scope.launch { drawerState.open() }
+                }) {
+                    Icon(Icons.Default.Menu, contentDescription = "Abrir menú")
+                }
+
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = {
+                        searchText = it
+                        homeViewModel.onSearchQueryChanged(it.text)
+                    },
+                    label = { Text("Buscar producto...") },
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(vertical = 8.dp, horizontal = 4.dp)
+                )
+                
+                // Shopping cart icon and counter
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .padding(start = 4.dp)
                         .clickable {
-                            Log.d(TAG, "Card clicked for: ${product.attributes.name}")
-                            homeViewModel.addItemToCart(product)
-                            Toast.makeText(context, "Producto Agregado: ${product.attributes.name}", Toast.LENGTH_SHORT).show()
+                            navController.navigate("cart")
                         },
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(
+                    Icon(
+                        imageVector = Icons.Default.ShoppingCart,
+                        contentDescription = "Carrito de compras",
+                        modifier = Modifier.size(28.dp)
+                    )
+                    if (cartItemCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .background(Color.Red, shape = MaterialTheme.shapes.extraSmall)
+                                .align(Alignment.TopEnd)
+                        ) {
+                            Text(
+                                text = cartItemCount.toString(),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Product grid
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filteredProducts) { product ->
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp)
+                            .clickable {
+                                homeViewModel.addItemToCart(product)
+                                Toast.makeText(context, "Producto Agregado: ${product.attributes.name}", Toast.LENGTH_SHORT).show()
+                            },
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        // Top part: Image and product details
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
                         ) {
-                            // Product image
-                            AsyncImage(
-                                model = product.attributes.images.firstOrNull() ?: "",
-                                contentDescription = "Imagen de ${product.attributes.name}",
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .padding(end = 8.dp)
-                            )
-
-                            // Product name, stock, and code
-                            Column(
-                                modifier = Modifier.weight(1f)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AsyncImage(
+                                    model = product.attributes.images.firstOrNull() ?: "",
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(60.dp)
+                                        .padding(end = 8.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = product.attributes.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 2
+                                    )
+                                    Text(
+                                        text = "Stock: ${product.attributes.stock?.quantity}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.Gray
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            HorizontalDivider()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = product.attributes.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 2
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Stock: ${product.attributes.stock?.quantity}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.Gray
+                                    text = "UNIDAD",
+                                    style = MaterialTheme.typography.labelSmall
                                 )
                                 Text(
-                                    text = product.attributes.product_code,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.Gray
+                                    text = "S/ ${product.attributes.product_price}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
-
-                        // Separator line
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(Color.LightGray)
-                        )
-
-                        // Bottom part: Unit and price
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    }
+                }
+                if (filteredProducts.isEmpty()) {
+                    item(span = { GridItemSpan(2) }) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "UNIDAD", // Assuming a fixed text for "Unidad"
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "No products found",
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.bodyMedium
                             )
-                            Text(
-                                text = "S/ ${product.attributes.product_price}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Button(onClick = { homeViewModel.fetchProducts() }) {
+                                Text("Actualizar")
+                            }
                         }
                     }
                 }
-            }
-            if (filteredProducts.isEmpty()) {
-                item(span = { GridItemSpan(2) }) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "No products found",
-                            modifier = Modifier.padding(16.dp),
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Button(
-                            onClick = {
-                                homeViewModel.fetchProducts()
-                                Log.d(TAG, "Refresh button clicked, re-fetching products")
-                            },
-                            modifier = Modifier.padding(top = 16.dp)
-                        ) {
-                            Text("Actualizar")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Bottom section (logout)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (userName != null) {
-                Text("Welcome, $userName!", style = MaterialTheme.typography.bodySmall)
-            } else {
-                Text("Welcome!", style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    viewModel.logout()
-                    navController.navigate("login") {
-                        popUpTo("home") { inclusive = true }
-                    }
-                }
-            ) {
-                Text("Logout", style = MaterialTheme.typography.labelMedium)
             }
         }
     }
