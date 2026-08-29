@@ -65,15 +65,6 @@ class CheckoutViewModel @Inject constructor(
     private val _dniText = MutableStateFlow("")
     val dniText: StateFlow<String> = _dniText.asStateFlow()
 
-    private val _pagoEfectivo = MutableStateFlow("0.00")
-    val pagoEfectivo: StateFlow<String> = _pagoEfectivo.asStateFlow()
-
-    private val _pagoVisa = MutableStateFlow("0.00")
-    val pagoVisa: StateFlow<String> = _pagoVisa.asStateFlow()
-
-    private val _totalRecibido = MutableStateFlow("0.00")
-    val totalRecibido: StateFlow<String> = _totalRecibido.asStateFlow()
-
     private val _pagoContado = MutableStateFlow(true)
     val pagoContado: StateFlow<Boolean> = _pagoContado.asStateFlow()
 
@@ -175,9 +166,6 @@ class CheckoutViewModel @Inject constructor(
 
     // Funciones para actualizar
     fun updateDni(text: String) { _dniText.value = text }
-    fun updatePagoEfectivo(text: String) { _pagoEfectivo.value = text }
-    fun updatePagoVisa(text: String) { _pagoVisa.value = text }
-    fun updateTotalRecibido(text: String) { _totalRecibido.value = text }
     fun updatePagoContado(isContado: Boolean) { _pagoContado.value = isContado }
 
     // Estado para errores y navegación
@@ -251,8 +239,8 @@ class CheckoutViewModel @Inject constructor(
                     discount = "0.00",
                     shipping = "0.00",
                     grandTotal = String.format("%.2f", totalAmount),
-                    receivedAmount = _totalRecibido.value.toDoubleOrNull() ?: 0.0,
-                    paidAmount = _totalRecibido.value.toDoubleOrNull() ?: 0.0,
+                    receivedAmount = 0.0,
+                    paidAmount = 0.0,
                     note = "Cotización desde App Android",
                     quotationItems = quotationItems
                 )

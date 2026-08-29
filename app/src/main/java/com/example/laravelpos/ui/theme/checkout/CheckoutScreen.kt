@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -71,9 +73,6 @@ fun CheckoutScreen(
 
     // ✅ Estados del formulario desde CheckoutViewModel
     val dniText by checkoutViewModel.dniText.collectAsStateWithLifecycle()
-    val pagoEfectivo by checkoutViewModel.pagoEfectivo.collectAsState()
-    val pagoVisa by checkoutViewModel.pagoVisa.collectAsState()
-    val totalRecibido by checkoutViewModel.totalRecibido.collectAsState()
     val pagoContado by checkoutViewModel.pagoContado.collectAsState()
 
     // ✅ Estados del ViewModel para control y tipos de documento
@@ -81,6 +80,7 @@ fun CheckoutScreen(
     val isLoadingDocumentTypes by checkoutViewModel.isLoadingDocumentTypes.collectAsState()
     val isDniFieldEnabled by checkoutViewModel.isDniFieldEnabled.collectAsState() // Nuevo estado
     val selectedDocType by checkoutViewModel.selectedDocumentType.collectAsState() // Usamos el estado del ViewModel
+    val customerData by checkoutViewModel.customerData.collectAsState() // Obtenemos datos del cliente
     val isLoadingCustomer by checkoutViewModel.isLoadingCustomer.collectAsState() // Añadido para resolver el error
 
     // ✅ Estados de carga, error y navegación desde CheckoutViewModel
@@ -269,6 +269,43 @@ fun CheckoutScreen(
                     Text("Crear Nuevo Cliente", color = Color.White)
                 }
             }
+            
+            // ✅ Información del Cliente Seleccionado
+            customerData?.let { customer ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Datos del Cliente",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = customer.attributes.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Doc: ${customer.attributes.document_number}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        if (customer.attributes.email.isNotEmpty()) {
+                            Text(
+                                text = "Email: ${customer.attributes.email}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // Radio buttons para Contado y Crédito
@@ -289,60 +326,14 @@ fun CheckoutScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Campos de pago
-            if (pagoContado) {
-                Column {
-                    OutlinedTextField(
-                        value = pagoEfectivo,
-                        onValueChange = { checkoutViewModel.updatePagoEfectivo(it) }, // ✅
-                        label = { Text("Pago efectivo") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = pagoVisa,
-                        onValueChange = { checkoutViewModel.updatePagoVisa(it) }, // ✅
-                        label = { Text("Pago Visa") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = totalRecibido,
-                        onValueChange = { checkoutViewModel.updateTotalRecibido(it) }, // ✅
-                        label = { Text("Total recibido") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-                }
-            } else {
-                // TODO: Implementar campos para pago a crédito
-                Text("Campos de crédito pendientes...")
+            // Ya no mostramos campos de pago ya que es una cotización
+            if (!pagoContado) {
+                Text("Nota: El pago a crédito se procesará según las condiciones pactadas.", 
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray)
             }
 
             Spacer(modifier = Modifier.weight(1f))
-
-            // Total y Vuelto — por ahora fijo, luego lo calculamos
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Vuelto:",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "S/ ${String.format("%.2f", 0.0)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
 
             // Botones de Atrás y Cobrar
             Row(
