@@ -4,6 +4,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -30,22 +32,25 @@ fun LoginScreen(navController: NavController) {
 
     val (emailFocusRequester, passwordFocusRequester) = remember { FocusRequester.createRefs() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val scrollState = rememberScrollState()
 
-    // Usamos un Box para superponer y posicionar elementos
-    Box(
+    // Usamos un único Column scrollable para evitar que los elementos se superpongan
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            // Este es el modificador correcto que maneja el espacio del teclado
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            // Y este padding es para el margen visual del contenido
-            .padding(16.dp)
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // Columna para el contenido principal, centrada en el Box
+        // Contenido principal
         Column(
             modifier = Modifier
-                .align(Alignment.Center)
-                .padding(start = 12.dp, end = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             // Estado para la animación de la imagen
             var targetOffset by remember { mutableStateOf(0.dp) }
@@ -108,9 +113,12 @@ fun LoginScreen(navController: NavController) {
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
                     onDone = {
-                        // Al presionar 'Listo', ocultamos el teclado
                         keyboardController?.hide()
-                        // Aquí va tu lógica para enviar el formulario, como viewModel.login()
+                        viewModel.login(email, password) {
+                            navController.navigate("home") {
+                                popUpTo("login") { inclusive = true }
+                            }
+                        }
                     }
                 )
             )
@@ -119,6 +127,7 @@ fun LoginScreen(navController: NavController) {
 
             Button(
                 onClick = {
+                    keyboardController?.hide()
                     viewModel.login(email, password) {
                         navController.navigate("home") {
                             popUpTo("login") { inclusive = true }
@@ -131,22 +140,27 @@ fun LoginScreen(navController: NavController) {
             }
 
             if (state.isLoading) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
             }
 
             state.error?.let { error ->
-                Text(text = error, color = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
-        }
 
-        // El texto de la versión se alinea al fondo del Box
-        Text(
-            text = "Versión ${BuildConfig.VERSION_NAME}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 8.dp)
-        )
+            // La versión ahora está DENTRO del scroll, asegurando que no tape nada
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = "Versión ${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
     }
 }
