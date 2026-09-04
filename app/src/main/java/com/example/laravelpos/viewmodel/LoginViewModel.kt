@@ -59,6 +59,7 @@ class LoginViewModel @Inject constructor(
     fun refreshProfile() {
         Log.d("LoginViewModel", "refreshProfile: Starting...")
         viewModelScope.launch {
+            _state.value = LoginState(isLoading = true)
             try {
                 val profileSuccess = repository.fetchProfile()
                 val configSuccess = repository.fetchConfig()
@@ -70,6 +71,9 @@ class LoginViewModel @Inject constructor(
                 Log.d("LoginViewModel", "refreshProfile: User info updated. Permissions count: ${_userPermissions.value.size}")
             } catch (e: Exception) {
                 Log.e("LoginViewModel", "refreshProfile: Error: ${e.message}", e)
+                _state.value = LoginState(error = e.message)
+            } finally {
+                _state.value = LoginState(isLoading = false)
             }
         }
     }

@@ -2,8 +2,7 @@ package com.example.laravelpos.data.repository
 
 import android.content.SharedPreferences
 import android.util.Log
-import com.example.laravelpos.data.model.LoginRequest
-import com.example.laravelpos.data.model.LoginResponse
+import com.example.laravelpos.data.model.*
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpRequestTimeoutException
@@ -22,12 +21,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
-
-@Serializable
-data class ConfigData(
-    val permissions: List<String> = emptyList(),
-    val version: String = ""
-)
 
 class LoginRepository @Inject constructor(
     private val httpClient: HttpClient,
@@ -112,22 +105,31 @@ class LoginRepository @Inject constructor(
         val authToken = token ?: sharedPreferences.getString("auth_token", null) ?: return false
         return withContext(Dispatchers.IO) {
             try {
+                Log.d("LoginRepository", "Fetching config...")
                 val response = httpClient.get("config") {
                     header("Authorization", "Bearer $authToken")
                 }
+                val rawResponse = response.bodyAsText()
+                Log.d("LoginRepository", "Config raw response: $rawResponse")
+
                 if (response.status.isSuccess()) {
-                    val rawResponse = response.bodyAsText()
                     // La respuesta tiene success, data, message. data tiene permissions.
                     val json = Json { ignoreUnknownKeys = true }
-                    val configResponse = json.decodeFromString<com.example.laravelpos.data.repository.LaravelResponse<com.example.laravelpos.data.repository.ConfigData>>(rawResponse)
+                    val configResponse = json.decodeFromString<LaravelResponse<ConfigData>>(rawResponse)
+                    
+                    val permissions = configResponse.data.permissions
+                    Log.d("LoginRepository", "Permissions loaded from config: ${permissions.size}")
                     
                     sharedPreferences.edit()
-                        .putStringSet("user_permissions", configResponse.data.permissions.toSet())
+                        .putStringSet("user_permissions", permissions.toSet())
                         .apply()
                     true
-                } else false
+                } else {
+                    Log.e("LoginRepository", "Fetch config failed with status: ${response.status}")
+                    false
+                }
             } catch (e: Exception) {
-                Log.e("LoginRepository", "Error fetching config: ${e.message}")
+                Log.e("LoginRepository", "Error fetching config: ${e.message}", e)
                 false
             }
         }

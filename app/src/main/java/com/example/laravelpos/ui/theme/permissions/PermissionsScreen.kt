@@ -6,8 +6,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -23,6 +25,11 @@ import com.example.laravelpos.viewmodel.LoginViewModel
 fun PermissionsScreen(navController: NavController, loginViewModel: LoginViewModel) {
     val userPermissions by loginViewModel.userPermissions.collectAsState()
     val userRole by loginViewModel.userRole.collectAsState()
+    val state by loginViewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        loginViewModel.refreshProfile()
+    }
 
     Scaffold(
         topBar = {
@@ -34,6 +41,18 @@ fun PermissionsScreen(navController: NavController, loginViewModel: LoginViewMod
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Regresar"
                         )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { loginViewModel.refreshProfile() }) {
+                        if (state.isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refrescar"
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

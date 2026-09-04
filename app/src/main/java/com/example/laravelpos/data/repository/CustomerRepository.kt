@@ -2,8 +2,7 @@ package com.example.laravelpos.data.repository
 
 import android.content.SharedPreferences
 import android.util.Log
-import com.example.laravelpos.data.model.Customer
-import com.example.laravelpos.data.model.CustomerResponse
+import com.example.laravelpos.data.model.*
 import com.example.laravelpos.data.repository.ProductRepository.Companion.TOKEN_KEY
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -25,20 +24,6 @@ import kotlinx.serialization.json.jsonArray
 import javax.inject.Inject
 
 private const val TAG = "CustomerRepository"
-
-// Clase para manejar la respuesta envuelta de Laravel (sendResponse)
-@Serializable
-data class LaravelResponse<T>(
-    val success: Boolean,
-    val data: T,
-    val message: String
-)
-
-// Clase para manejar el recurso individual envuelto (JsonResource)
-@Serializable
-data class DataWrapper<T>(
-    val data: T
-)
 
 @Serializable
 data class CustomerCreateRequest(
