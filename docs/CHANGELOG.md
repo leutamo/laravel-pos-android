@@ -7,8 +7,10 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
 ### Añadido
 - **Gestión de Roles y Permisos**:
   - Conexión con el endpoint `/api/config` para obtener capacidades del usuario.
-  - Nueva pantalla **"Mis Permisos"** en el menú lateral para auditoría de usuario.
+  - Nueva pantalla **"Mis Permisos"** en el menú lateral con botón de **Refrescar** manual.
   - Lógica inteligente en Checkout: elige automáticamente entre **Venta Directa** o **Cotización** basándose en el permiso `manage_sale`.
+- **Arquitectura de Datos**:
+  - Creación de `ApiWrappers.kt` para centralizar los envoltorios de respuesta de Laravel (`LaravelResponse`, `DataWrapper`, `ConfigData`).
 - **Gestión de Clientes Real**:
   - Búsqueda por número de documento vinculada a la base de datos Laravel.
   - Creación de nuevos clientes con validaciones del servidor y selector de tipo de documento (DNI, RUC, etc.).
@@ -22,11 +24,13 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
 - **Robustez de API**:
   - Manejo de campos nulos en `order_tax`, `tax_type` y `last_name` para evitar cierres inesperados.
   - Implementación de `ProductImagesSerializer` para manejar inconsistencias en el formato de imágenes (Array vs Object).
+  - Añadidos logs de diagnóstico en `LoginRepository` para depurar respuestas de configuración y perfiles.
 - **UX/UI**:
   - Sincronización del buscador de productos entre pantallas.
   - Limpieza automática de datos de cliente al finalizar una transacción.
   - Eliminación de mensajes `Toast` para una interfaz más limpia.
   - Botón de borrado rápido ("X") en la tarjeta de cliente seleccionado.
+  - Corrección de referencias a iconos de sistema (Refresh y ArrowBack).
 - **Resumen Dinámico**:
   - La pantalla de resumen ahora carga los datos directamente desde el servidor usando el ID del documento generado.
 
