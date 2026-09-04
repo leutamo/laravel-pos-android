@@ -9,6 +9,7 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
   - Conexión con el endpoint `/api/config` para obtener capacidades del usuario.
   - Nueva pantalla **"Mis Permisos"** en el menú lateral con botón de **Refrescar** manual.
   - Lógica inteligente en Checkout: elige automáticamente entre **Venta Directa** o **Cotización** basándose en el permiso `manage_sale`.
+  - **Navegación Dinámica de Resumen**: Soporte para visualizar comprobantes de ventas y cotizaciones indistintamente.
 - **Arquitectura de Datos**:
   - Creación de `ApiWrappers.kt` para centralizar los envoltorios de respuesta de Laravel (`LaravelResponse`, `DataWrapper`, `ConfigData`).
 - **Gestión de Clientes Real**:
@@ -24,7 +25,8 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
 - **Robustez de API**:
   - Manejo de campos nulos en `order_tax`, `tax_type` y `last_name` para evitar cierres inesperados.
   - Implementación de `ProductImagesSerializer` para manejar inconsistencias en el formato de imágenes (Array vs Object).
-  - Añadidos logs de diagnóstico en `LoginRepository` para depurar respuestas de configuración y perfiles.
+  - Añadidos logs de diagnóstico en `LoginRepository` y `SaleRepository` para depurar respuestas del servidor.
+  - **Unificación de Resumen**: Corrección del error de campos faltantes al visualizar ventas directas mediante el uso del endpoint `/api/sales/{id}` y unificación de mapeo de ítems.
 - **UX/UI**:
   - Sincronización del buscador de productos entre pantallas.
   - Limpieza automática de datos de cliente al finalizar una transacción.
