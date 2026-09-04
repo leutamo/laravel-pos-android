@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.QuotationData
 import com.example.laravelpos.data.repository.QuotationRepository
+import com.example.laravelpos.data.repository.SaleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,16 +20,22 @@ data class SummaryState(
 
 @HiltViewModel
 class SummaryViewModel @Inject constructor(
-    private val quotationRepository: QuotationRepository
+    private val quotationRepository: QuotationRepository,
+    private val saleRepository: SaleRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SummaryState())
     val state: StateFlow<SummaryState> = _state.asStateFlow()
 
-    fun loadQuotation(id: Int) {
+    fun loadData(type: String, id: Int) {
         viewModelScope.launch {
             _state.value = SummaryState(isLoading = true)
-            val result = quotationRepository.getQuotation(id)
+            val result = if (type == "sale") {
+                saleRepository.getSale(id)
+            } else {
+                quotationRepository.getQuotation(id)
+            }
+
             if (result.success) {
                 _state.value = SummaryState(quotation = result.data, isLoading = false)
             } else {

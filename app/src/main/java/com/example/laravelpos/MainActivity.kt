@@ -69,11 +69,15 @@ fun AppNavigation() {
         }
 */
         composable(
-            "summary_screen/{quotationId}",
-            arguments = listOf(navArgument("quotationId") { type = NavType.IntType })
+            "summary_screen/{type}/{id}",
+            arguments = listOf(
+                navArgument("type") { type = NavType.StringType },
+                navArgument("id") { type = NavType.IntType }
+            )
         ) { backStackEntry ->
-            val quotationId = backStackEntry.arguments?.getInt("quotationId") ?: 0
-            SummaryScreen(navController = navController, homeViewModel, quotationId = quotationId)
+            val type = backStackEntry.arguments?.getString("type") ?: "quotation"
+            val id = backStackEntry.arguments?.getInt("id") ?: 0
+            SummaryScreen(navController = navController, homeViewModel, type = type, id = id)
         }
     }
 }

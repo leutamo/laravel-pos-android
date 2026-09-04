@@ -2,6 +2,7 @@ package com.example.laravelpos.data.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class QuotationItem(
@@ -70,17 +71,22 @@ data class QuotationAttributes(
     @SerialName("received_amount") val receivedAmount: Double,
     @SerialName("paid_amount") val paidAmount: Double,
     val note: String?,
-    val status: String,
-    @SerialName("is_sale_created") val isSaleCreated: String?,
+    val status: JsonElement, // Cambiado a JsonElement para aceptar Int o String
+    @SerialName("is_sale_created") val isSaleCreated: JsonElement? = null,
     @SerialName("reference_code") val referenceCode: String,
-    @SerialName("quotation_items") val quotationItems: List<QuotationItemResponse>,
+    @SerialName("quotation_items") val quotationItems: List<QuotationItemResponse>? = null,
+    @SerialName("sale_items") val saleItems: List<QuotationItemResponse>? = null, // Para ventas directas
     @SerialName("created_at") val createdAt: String
-)
+) {
+    // Propiedad calculada para obtener los ítems sin importar el nombre del campo
+    val items: List<QuotationItemResponse> get() = quotationItems ?: saleItems ?: emptyList()
+}
 
 @Serializable
 data class QuotationItemResponse(
     val id: Int,
-    @SerialName("quotation_id") val quotationId: Int,
+    @SerialName("quotation_id") val quotationId: Int? = null,
+    @SerialName("sale_id") val saleId: Int? = null,
     @SerialName("product_id") val productId: Int,
     @SerialName("product_price") val productPrice: Double,
     @SerialName("net_unit_price") val netUnitPrice: Double,
@@ -102,9 +108,9 @@ data class SaleUnit(
     val id: Int,
     val name: String,
     @SerialName("short_name") val shortName: String,
-    @SerialName("base_unit") val baseUnit: Int,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("updated_at") val updatedAt: String
+    @SerialName("base_unit") val baseUnit: Int? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null
 )
 
 @Serializable

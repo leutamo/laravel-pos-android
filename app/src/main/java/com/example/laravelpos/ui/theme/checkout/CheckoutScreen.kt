@@ -99,11 +99,16 @@ fun CheckoutScreen(
 
     // ✅ Navegar al resumen cuando se emite un ID
     LaunchedEffect(navigateToSummary) {
-        navigateToSummary?.let { id ->
-            homeViewModel.clearCart() // ✅ Limpiar el carrito tras éxito
-            checkoutViewModel.clearCheckoutData() // ✅ Limpiar datos del cliente para la próxima venta
-            navController.navigate("summary_screen/$id")
-            checkoutViewModel.onSummaryNavigated()
+        navigateToSummary?.let { result ->
+            val parts = result.split("|")
+            if (parts.size == 2) {
+                val type = parts[0]
+                val id = parts[1]
+                homeViewModel.clearCart()
+                checkoutViewModel.clearCheckoutData()
+                navController.navigate("summary_screen/$type/$id")
+                checkoutViewModel.onSummaryNavigated()
+            }
         }
     }
 

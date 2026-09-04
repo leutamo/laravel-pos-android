@@ -18,8 +18,11 @@ import com.example.laravelpos.data.repository.LoginRepository
 import com.example.laravelpos.data.repository.QuotationRepository
 import com.example.laravelpos.data.repository.SaleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -232,6 +235,10 @@ class CheckoutViewModel @Inject constructor(
             _isLoading.value = true
             _apiError.value = null
             try {
+                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+                val currentDate = isoFormat.format(Date())
+                val totalIgv = totalAmount - (totalAmount / 1.18)
+
                 if (canManageSale) {
                     // REALIZAR VENTA DIRECTA
                     val saleItems = cartItems.map { product ->
@@ -256,10 +263,6 @@ class CheckoutViewModel @Inject constructor(
                         )
                     }
 
-                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-                    val currentDate = isoFormat.format(Date())
-                    val totalIgv = totalAmount - (totalAmount / 1.18)
-
                     val request = SaleRequest(
                         date = currentDate,
                         customerId = customerId,
@@ -271,23 +274,22 @@ class CheckoutViewModel @Inject constructor(
                         grandTotal = String.format("%.2f", totalAmount),
                         receivedAmount = "0.00",
                         paidAmount = "0.00",
-                        paymentType = 1, // Cash
-                        status = 1, // Completed
-                        paymentStatus = 2, // Unpaid
+                        paymentType = 1,
+                        status = 1,
+                        paymentStatus = 2,
                         note = "Venta directa desde App Android",
                         saleItems = saleItems
                     )
 
                     val result = saleRepository.createSale(request)
                     if (result.success) {
-                        // _toastEvent.emit("Venta realizada con éxito")
-                        // TODO: Necesitamos manejar el ID de la venta para el resumen
-                        _navigateToSummary.value = "sale" 
+                        val saleId = result.message 
+                        _navigateToSummary.value = "sale|$saleId" 
                     } else {
                         _apiError.value = result.message
                     }
                 } else {
-                    // REALIZAR COTIZACIÓN (Actual flujo)
+                    // REALIZAR COTIZACIÓN
                     val quotationItems = cartItems.map { product ->
                         val quantity = itemQuantities[product.id.toString()] ?: 0
                         val subTotal = product.attributes.product_price * quantity
@@ -310,10 +312,6 @@ class CheckoutViewModel @Inject constructor(
                         )
                     }
 
-                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-                    val currentDate = isoFormat.format(Date())
-                    val totalIgv = totalAmount - (totalAmount / 1.18)
-
                     val request = QuotationRequest(
                         date = currentDate,
                         customerId = customerId,
@@ -331,16 +329,16 @@ class CheckoutViewModel @Inject constructor(
                     )
 
                     val result = quotationRepository.createQuotation(request)
-
                     if (result.success) {
-                        _navigateToSummary.value = result.data?.id.toString()
+                        val quotationId = result.data?.id.toString()
+                        _navigateToSummary.value = "quotation|$quotationId"
                     } else {
                         _apiError.value = result.message
                     }
                 }
             } catch (e: Exception) {
                 Log.e("CheckoutViewModel", "Error en checkout: ${e.message}", e)
-                _apiError.value = "Error al procesar la cotización: ${e.message}"
+                _apiError.value = "Error al procesar: ${e.message}"
             } finally {
                 _isLoading.value = false
             }

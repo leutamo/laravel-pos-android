@@ -53,15 +53,16 @@ import com.example.laravelpos.viewmodel.CheckoutViewModel
 fun SummaryScreen(
     navController: NavController,
     homeViewModel: HomeViewModel,
-    quotationId: Int,
+    type: String,
+    id: Int,
     summaryViewModel: SummaryViewModel = hiltViewModel(),
-    checkoutViewModel: CheckoutViewModel = hiltViewModel() // ✅ Añadido
+    checkoutViewModel: CheckoutViewModel = hiltViewModel()
 ) {
     val state by summaryViewModel.state.collectAsState()
     val quotation = state.quotation
 
-    LaunchedEffect(quotationId) {
-        summaryViewModel.loadQuotation(quotationId)
+    LaunchedEffect(id, type) {
+        summaryViewModel.loadData(type, id)
     }
 
     var emailText by remember { mutableStateOf("") }
@@ -80,8 +81,9 @@ fun SummaryScreen(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
+                            val titleText = if (type == "sale") "Venta" else "Cotización"
                             Text(
-                                text = "Cotización #${attr.referenceCode}",
+                                text = "$titleText #${attr.referenceCode}",
                                 color = Color.White,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
@@ -144,7 +146,7 @@ fun SummaryScreen(
 
                 // Lista de productos
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(attr.quotationItems) { item ->
+                    items(attr.items) { item ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -153,7 +155,7 @@ fun SummaryScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Producto ${item.productId}", // TODO: El servidor debería devolver el nombre
+                                text = "Producto ${item.productId}",
                                 modifier = Modifier.weight(2f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
