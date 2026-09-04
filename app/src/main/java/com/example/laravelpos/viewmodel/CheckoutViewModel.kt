@@ -9,10 +9,14 @@ import com.example.laravelpos.data.model.DocumentType
 import com.example.laravelpos.data.model.Product
 import com.example.laravelpos.data.model.QuotationItem
 import com.example.laravelpos.data.model.QuotationRequest
+import com.example.laravelpos.data.model.SaleItem
+import com.example.laravelpos.data.model.SaleRequest
 import com.example.laravelpos.data.repository.CustomerRepository
 import com.example.laravelpos.data.repository.CustomerResult
 import com.example.laravelpos.data.repository.DocumentTypeRepository
+import com.example.laravelpos.data.repository.LoginRepository
 import com.example.laravelpos.data.repository.QuotationRepository
+import com.example.laravelpos.data.repository.SaleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +33,9 @@ import javax.inject.Inject
 class CheckoutViewModel @Inject constructor(
     private val documentTypeRepository: DocumentTypeRepository,
     private val quotationRepository: QuotationRepository,
-    private val customerRepository: CustomerRepository
+    private val customerRepository: CustomerRepository,
+    private val saleRepository: SaleRepository,
+    private val loginRepository: LoginRepository
 ) : ViewModel() {
 
     // Estado para tipos de documento
@@ -219,59 +225,118 @@ class CheckoutViewModel @Inject constructor(
         itemQuantities: Map<String, Int>
     ) {
         val customerId = _customerData.value?.id ?: 6 
+        val permissions = loginRepository.getUserPermissions()
+        val canManageSale = permissions.contains("manage_sale")
 
         viewModelScope.launch {
             _isLoading.value = true
             _apiError.value = null
             try {
-                val quotationItems = cartItems.map { product ->
-                    val quantity = itemQuantities[product.id.toString()] ?: 0
-                    val subTotal = product.attributes.product_price * quantity
-                    val netUnitPrice = product.attributes.product_price / 1.18
-                    val taxAmount = subTotal - (netUnitPrice * quantity)
+                if (canManageSale) {
+                    // REALIZAR VENTA DIRECTA
+                    val saleItems = cartItems.map { product ->
+                        val quantity = itemQuantities[product.id.toString()] ?: 0
+                        val subTotal = product.attributes.product_price * quantity
+                        val netUnitPrice = product.attributes.product_price / 1.18
+                        val taxAmount = subTotal - (netUnitPrice * quantity)
 
-                    QuotationItem(
-                        productId = product.id,
-                        quantity = quantity,
-                        productPrice = String.format("%.2f", product.attributes.product_price),
-                        netUnitPrice = String.format("%.2f", netUnitPrice),
-                        taxType = 1,
-                        taxValue = "18.00",
-                        taxAmount = String.format("%.2f", taxAmount),
-                        discountType = 2,
-                        discountValue = "0.00",
-                        discountAmount = "0.00",
-                        saleUnit = 1,
-                        subTotal = String.format("%.2f", subTotal)
+                        SaleItem(
+                            productId = product.id,
+                            quantity = quantity,
+                            productPrice = String.format("%.2f", product.attributes.product_price),
+                            netUnitPrice = String.format("%.2f", netUnitPrice),
+                            taxType = 1,
+                            taxValue = "18.00",
+                            taxAmount = String.format("%.2f", taxAmount),
+                            discountType = 2,
+                            discountValue = "0.00",
+                            discountAmount = "0.00",
+                            saleUnit = 1,
+                            subTotal = String.format("%.2f", subTotal)
+                        )
+                    }
+
+                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+                    val currentDate = isoFormat.format(Date())
+                    val totalIgv = totalAmount - (totalAmount / 1.18)
+
+                    val request = SaleRequest(
+                        date = currentDate,
+                        customerId = customerId,
+                        warehouseId = 1,
+                        taxRate = "18.00",
+                        taxAmount = String.format("%.2f", totalIgv),
+                        discount = "0.00",
+                        shipping = "0.00",
+                        grandTotal = String.format("%.2f", totalAmount),
+                        receivedAmount = "0.00",
+                        paidAmount = "0.00",
+                        paymentType = 1, // Cash
+                        status = 1, // Completed
+                        paymentStatus = 2, // Unpaid
+                        note = "Venta directa desde App Android",
+                        saleItems = saleItems
                     )
-                }
 
-                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-                val currentDate = isoFormat.format(Date())
-                val totalIgv = totalAmount - (totalAmount / 1.18)
-
-                val request = QuotationRequest(
-                    date = currentDate,
-                    customerId = customerId,
-                    warehouseId = 1, 
-                    status = 1,
-                    taxRate = "18.00",
-                    taxAmount = String.format("%.2f", totalIgv),
-                    discount = "0.00",
-                    shipping = "0.00",
-                    grandTotal = String.format("%.2f", totalAmount),
-                    receivedAmount = 0.0,
-                    paidAmount = 0.0,
-                    note = "Cotización desde App Android",
-                    quotationItems = quotationItems
-                )
-
-                val result = quotationRepository.createQuotation(request)
-
-                if (result.success) {
-                    _navigateToSummary.value = result.data?.id.toString()
+                    val result = saleRepository.createSale(request)
+                    if (result.success) {
+                        // _toastEvent.emit("Venta realizada con éxito")
+                        // TODO: Necesitamos manejar el ID de la venta para el resumen
+                        _navigateToSummary.value = "sale" 
+                    } else {
+                        _apiError.value = result.message
+                    }
                 } else {
-                    _apiError.value = result.message
+                    // REALIZAR COTIZACIÓN (Actual flujo)
+                    val quotationItems = cartItems.map { product ->
+                        val quantity = itemQuantities[product.id.toString()] ?: 0
+                        val subTotal = product.attributes.product_price * quantity
+                        val netUnitPrice = product.attributes.product_price / 1.18
+                        val taxAmount = subTotal - (netUnitPrice * quantity)
+
+                        QuotationItem(
+                            productId = product.id,
+                            quantity = quantity,
+                            productPrice = String.format("%.2f", product.attributes.product_price),
+                            netUnitPrice = String.format("%.2f", netUnitPrice),
+                            taxType = 1,
+                            taxValue = "18.00",
+                            taxAmount = String.format("%.2f", taxAmount),
+                            discountType = 2,
+                            discountValue = "0.00",
+                            discountAmount = "0.00",
+                            saleUnit = 1,
+                            subTotal = String.format("%.2f", subTotal)
+                        )
+                    }
+
+                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+                    val currentDate = isoFormat.format(Date())
+                    val totalIgv = totalAmount - (totalAmount / 1.18)
+
+                    val request = QuotationRequest(
+                        date = currentDate,
+                        customerId = customerId,
+                        warehouseId = 1, 
+                        status = 1,
+                        taxRate = "18.00",
+                        taxAmount = String.format("%.2f", totalIgv),
+                        discount = "0.00",
+                        shipping = "0.00",
+                        grandTotal = String.format("%.2f", totalAmount),
+                        receivedAmount = 0.0,
+                        paidAmount = 0.0,
+                        note = "Cotización desde App Android",
+                        quotationItems = quotationItems
+                    )
+
+                    val result = quotationRepository.createQuotation(request)
+
+                    if (result.success) {
+                        _navigateToSummary.value = result.data?.id.toString()
+                    } else {
+                        _apiError.value = result.message
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("CheckoutViewModel", "Error en checkout: ${e.message}", e)

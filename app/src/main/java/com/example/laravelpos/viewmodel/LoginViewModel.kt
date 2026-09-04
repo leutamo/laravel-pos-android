@@ -43,6 +43,9 @@ class LoginViewModel @Inject constructor(
     private val _userRole = MutableStateFlow<String?>(repository.getUserRole())
     val userRole: StateFlow<String?> = _userRole
 
+    private val _userPermissions = MutableStateFlow<List<String>>(repository.getUserPermissions())
+    val userPermissions: StateFlow<List<String>> = _userPermissions.asStateFlow()
+
     private val _isAuthenticated = MutableStateFlow(sharedPreferences.getString(TOKEN_KEY, null) != null)
     val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
 
@@ -57,13 +60,14 @@ class LoginViewModel @Inject constructor(
         Log.d("LoginViewModel", "refreshProfile: Starting...")
         viewModelScope.launch {
             try {
-                val success = repository.fetchProfile()
-                Log.d("LoginViewModel", "refreshProfile: Fetch result: $success")
-                if (success) {
-                    _userName.value = repository.getUserName()
-                    _userRole.value = repository.getUserRole()
-                    Log.d("LoginViewModel", "refreshProfile: User info updated. Name: ${_userName.value}, Role: ${_userRole.value}")
-                }
+                val profileSuccess = repository.fetchProfile()
+                val configSuccess = repository.fetchConfig()
+                Log.d("LoginViewModel", "refreshProfile: Profile: $profileSuccess, Config: $configSuccess")
+                
+                _userName.value = repository.getUserName()
+                _userRole.value = repository.getUserRole()
+                _userPermissions.value = repository.getUserPermissions()
+                Log.d("LoginViewModel", "refreshProfile: User info updated. Permissions count: ${_userPermissions.value.size}")
             } catch (e: Exception) {
                 Log.e("LoginViewModel", "refreshProfile: Error: ${e.message}", e)
             }

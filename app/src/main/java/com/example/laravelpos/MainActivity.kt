@@ -16,6 +16,7 @@ import com.example.laravelpos.ui.theme.cart.CartScreen
 import com.example.laravelpos.ui.theme.checkout.CheckoutScreen
 import com.example.laravelpos.ui.theme.home.HomeScreen
 import com.example.laravelpos.ui.theme.login.LoginScreen
+import com.example.laravelpos.ui.theme.permissions.PermissionsScreen
 import com.example.laravelpos.ui.theme.summary.SummaryScreen
 import com.example.laravelpos.viewmodel.CheckoutViewModel
 import com.example.laravelpos.viewmodel.HomeViewModel
@@ -51,6 +52,9 @@ fun AppNavigation() {
         }
         composable("cart") {
             CartScreen(navController, homeViewModel)
+        }
+        composable("permissions") {
+            PermissionsScreen(navController, viewModel)
         }
         composable("checkout") { backStackEntry ->
             CheckoutScreen(

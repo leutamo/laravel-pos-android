@@ -19,7 +19,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
+
+@Serializable
+data class ConfigData(
+    val permissions: List<String> = emptyList(),
+    val version: String = ""
+)
 
 class LoginRepository @Inject constructor(
     private val httpClient: HttpClient,
@@ -35,12 +43,14 @@ class LoginRepository @Inject constructor(
                 sharedPreferences.edit()
                     .putString("auth_token", response.data.token)
                     .putString("user_name", response.data.user.firstName)
+                    .putStringSet("user_permissions", response.data.permissions.toSet())
                     .apply()
                 
                 // No bloqueamos el login esperando el perfil. 
                 // Lo lanzamos en segundo plano.
                 CoroutineScope(Dispatchers.IO).launch {
                     fetchProfile(response.data.token)
+                    fetchConfig(response.data.token) // También obtenemos la config completa
                 }
             }
             response
@@ -98,6 +108,31 @@ class LoginRepository @Inject constructor(
         }
     }
 
+    suspend fun fetchConfig(token: String? = null): Boolean {
+        val authToken = token ?: sharedPreferences.getString("auth_token", null) ?: return false
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = httpClient.get("config") {
+                    header("Authorization", "Bearer $authToken")
+                }
+                if (response.status.isSuccess()) {
+                    val rawResponse = response.bodyAsText()
+                    // La respuesta tiene success, data, message. data tiene permissions.
+                    val json = Json { ignoreUnknownKeys = true }
+                    val configResponse = json.decodeFromString<com.example.laravelpos.data.repository.LaravelResponse<com.example.laravelpos.data.repository.ConfigData>>(rawResponse)
+                    
+                    sharedPreferences.edit()
+                        .putStringSet("user_permissions", configResponse.data.permissions.toSet())
+                        .apply()
+                    true
+                } else false
+            } catch (e: Exception) {
+                Log.e("LoginRepository", "Error fetching config: ${e.message}")
+                false
+            }
+        }
+    }
+
     fun isLoggedIn(): Boolean {
         return sharedPreferences.getString("auth_token", null) != null
     }
@@ -108,6 +143,10 @@ class LoginRepository @Inject constructor(
 
     fun getUserRole(): String? {
         return sharedPreferences.getString("user_role", "Cargando...")
+    }
+
+    fun getUserPermissions(): List<String> {
+        return sharedPreferences.getStringSet("user_permissions", emptySet())?.toList() ?: emptyList()
     }
 
     fun logout() {
