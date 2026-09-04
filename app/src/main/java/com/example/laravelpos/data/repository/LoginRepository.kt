@@ -156,6 +156,7 @@ class LoginRepository @Inject constructor(
             .remove("auth_token")
             .remove("user_name")
             .remove("user_role")
+            .remove("user_permissions")
             .apply()
     }
 }
