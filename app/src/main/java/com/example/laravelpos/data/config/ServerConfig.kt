@@ -23,25 +23,53 @@ class ServerConfig @Inject constructor(
     }
 
     fun getBaseUrl(): String {
-        val ip = getServerIp()
-        return "http://$ip:$DEFAULT_PORT/api/"
+        val input = getServerIp().trim()
+        
+        // Si ya incluye http o https, lo usamos tal cual
+        if (input.startsWith("http://") || input.startsWith("https://")) {
+            return if (input.endsWith("/")) "${input}api/" else "$input/api/"
+        }
+
+        // Si parece un dominio (contiene letras)
+        val isDomain = input.any { it.isLetter() }
+        
+        return if (isDomain) {
+            "https://$input/api/"
+        } else {
+            // Si es IP, verificamos si ya tiene puerto
+            if (input.contains(":")) {
+                "http://$input/api/"
+            } else {
+                "http://$input:$DEFAULT_PORT/api/"
+            }
+        }
     }
 
     fun getFullImageUrl(relativePath: String?): String {
         if (relativePath.isNullOrBlank()) return ""
         
-        val ip = getServerIp()
+        val input = getServerIp().trim()
+        val isDomain = input.any { it.isLetter() }
         
         // Si el servidor ya devuelve una URL completa (http...)
         if (relativePath.startsWith("http")) {
-            // Reemplazamos 127.0.0.1 o localhost por la IP real configurada
-            // ya que el servidor suele devolver su propia dirección local.
+            // Reemplazamos 127.0.0.1 o localhost por la IP o Dominio real
+            // Quitamos el protocolo del input para el replace si lo tuviera
+            val cleanInput = input.replace("http://", "").replace("https://", "").removeSuffix("/")
             return relativePath
-                .replace("127.0.0.1", ip)
-                .replace("localhost", ip)
+                .replace("127.0.0.1", cleanInput)
+                .replace("localhost", cleanInput)
         }
         
-        // Si es una ruta relativa, asumimos la estructura de Laravel
-        return "http://$ip:$DEFAULT_PORT/storage/$relativePath"
+        // Si es una ruta relativa
+        return if (isDomain) {
+            "https://$input/storage/$relativePath"
+        } else {
+            if (input.contains(":")) {
+                "http://$input/storage/$relativePath"
+            } else {
+                "http://$input:$DEFAULT_PORT/storage/$relativePath"
+            }
+        }
     }
 }
