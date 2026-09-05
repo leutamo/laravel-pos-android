@@ -35,6 +35,10 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
   - Corrección de referencias a iconos de sistema (Refresh y ArrowBack).
 - **Resumen Dinámico**:
   - La pantalla de resumen ahora carga los datos directamente desde el servidor usando el ID del documento generado.
+- **Producción y Conectividad**:
+  - Soporte para dominios reales (ej: `admink.incode.lat`) con detección automática de HTTPS.
+  - Gestión inteligente de puertos: ya no es necesario escribir `:8000` si se usa un dominio.
+  - Limpieza automática de espacios en la configuración del servidor.
 
 ## [Anteriores] - Cimientos y Navegación
 - Implementación de IP dinámica del servidor.
