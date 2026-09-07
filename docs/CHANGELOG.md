@@ -29,6 +29,8 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
   - **Unificación de Resumen**: Corrección del error de campos faltantes al visualizar ventas directas mediante el uso del endpoint `/api/sales/{id}` y unificación de mapeo de ítems.
 - **UX/UI**:
   - Sincronización del buscador de productos entre pantallas.
+  - Implementación de búsqueda directamente en el servidor con optimización *debounce* para mayor fluidez.
+  - Corrección del límite de visualización: ahora se muestran hasta 100 productos (antes limitado a 10 por paginación).
   - Limpieza automática de datos de cliente al finalizar una transacción.
   - Eliminación de mensajes `Toast` para una interfaz más limpia.
   - Botón de borrado rápido ("X") en la tarjeta de cliente seleccionado.
