@@ -28,6 +28,7 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
   - Añadidos logs de diagnóstico en `LoginRepository` y `SaleRepository` para depurar respuestas del servidor.
   - **Unificación de Resumen**: Corrección del error de campos faltantes al visualizar ventas directas mediante el uso del endpoint `/api/sales/{id}` y unificación de mapeo de ítems.
 - **UX/UI**:
+  - Visualización de la unidad de venta real (Caja, Kilo, Unidad, etc.) en la lista de productos.
   - Sincronización del buscador de productos entre pantallas.
   - Implementación de búsqueda directamente en el servidor con optimización *debounce* para mayor fluidez.
   - Corrección del límite de visualización: ahora se muestran hasta 100 productos (antes limitado a 10 por paginación).
