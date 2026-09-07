@@ -313,7 +313,7 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = "UNIDAD",
+                                        text = product.attributes.sale_unit_name.name.uppercase(),
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                     Text(
