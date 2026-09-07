@@ -31,17 +31,24 @@ class ProductRepository @Inject constructor(
         val message: String
     )
 
-    suspend fun getProducts(): Result<List<Product>> {
+    suspend fun getProducts(search: String? = null): Result<List<Product>> {
         val token = sharedPreferences.getString(TOKEN_KEY, null)
         return withContext(Dispatchers.IO) {
             if (token != null) {
                 try {
                     val response = client.get("products") {
                         header("Authorization", "Bearer $token")
-                        parameter("per_page", "100")
+                        // El backend usa page[size] para la cantidad de elementos
+                        parameter("page[size]", "100")
                         parameter("sort", "-created_at")
+                        
+                        // Si hay una búsqueda, la enviamos al servidor
+                        if (!search.isNullOrBlank()) {
+                            parameter("filter[search]", search)
+                        }
                     }
                     val responseText = response.bodyAsText()
+                    Log.d("ProductRepository", "Requesting products (search: $search)")
                     Log.d("ProductRepository", "Response: $responseText")
 
                     if (response.status.value == 200) {

@@ -15,11 +15,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.FlowPreview
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,28 +74,26 @@ class HomeViewModel @Inject constructor(
     private val _apiError = MutableStateFlow<String?>(null)
     val apiError: StateFlow<String?> = _apiError.asStateFlow()
 
-
-    val filteredProducts: StateFlow<List<Product>>
-        get() = combine(_products, _searchQuery) { products, query ->
-            if (query.isBlank()) products
-            else products.filter { it.attributes.name.contains(query, ignoreCase = true) }
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    // La lista filtrada ahora simplemente expone lo que devuelve el servidor
+    val filteredProducts: StateFlow<List<Product>> = _products.asStateFlow()
 
     init {
-        Log.d(TAG, "ViewModel initialized, starting fetchProducts")
-        fetchProducts()
+        Log.d(TAG, "ViewModel initialized, starting search observer")
+        // Escuchar cambios en la búsqueda con debounce (evita peticiones excesivas)
+        @OptIn(FlowPreview::class)
+        viewModelScope.launch {
+            searchQuery.debounce(500).collect { query ->
+                fetchProducts(query)
+            }
+        }
     }
 
-    fun fetchProducts() {
+    fun fetchProducts(search: String? = _searchQuery.value) {
         viewModelScope.launch {
             _isLoading.value = true
             _apiError.value = null
-            Log.d(TAG, "fetchProducts: Fetching products from repository...")
-            val result = repository.getProducts()
+            Log.d(TAG, "fetchProducts: Requesting products from server (search: $search)...")
+            val result = repository.getProducts(search)
             
             result.onSuccess { productList ->
                 Log.d(TAG, "Server responded with ${productList.size} products")
