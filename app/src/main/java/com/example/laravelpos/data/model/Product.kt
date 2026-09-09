@@ -1,5 +1,6 @@
 package com.example.laravelpos.data.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
@@ -54,7 +55,18 @@ data class ProductAttributes(
     val warehouse: List<Warehouse>,
     val barcode_url: String,
     val in_stock: Int,
-    val variation_product: VariationProduct? = null
+    val variation_product: VariationProduct? = null,
+    val conversions: List<ProductConversion> = emptyList()
+)
+
+@Serializable
+data class ProductConversion(
+    val id: Int,
+    @SerialName("to_unit_id") val toUnitId: Int,
+    @SerialName("to_unit_name") val toUnitName: String,
+    val quantity: Int,
+    val price: Double,
+    @SerialName("wholesale_price") val wholesalePrice: Double
 )
 
 @Serializable
@@ -118,3 +130,19 @@ data class VariationProduct(
 data class ProductLinks(
     val self: String
 )
+
+@Serializable
+data class CartItem(
+    val product: Product,
+    val quantity: Int,
+    val selectedConversion: ProductConversion? = null
+) {
+    val unitName: String
+        get() = selectedConversion?.toUnitName ?: product.attributes.sale_unit_name.name
+
+    val unitPrice: Double
+        get() = selectedConversion?.price ?: product.attributes.product_price
+
+    val subTotal: Double
+        get() = unitPrice * quantity
+}

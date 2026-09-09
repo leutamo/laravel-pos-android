@@ -3,6 +3,7 @@ package com.example.laravelpos.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.laravelpos.data.model.CartItem
 import com.example.laravelpos.data.model.Customer
 import com.example.laravelpos.data.model.CustomerLinks
 import com.example.laravelpos.data.model.DocumentType
@@ -224,8 +225,7 @@ class CheckoutViewModel @Inject constructor(
     fun processCheckout(
         totalAmount: Double,
         selectedReceiptType: String?,
-        cartItems: List<Product>,
-        itemQuantities: Map<String, Int>
+        cartItems: List<CartItem>
     ) {
         val customerId = _customerData.value?.id ?: 6 
         val permissions = loginRepository.getUserPermissions()
@@ -241,16 +241,18 @@ class CheckoutViewModel @Inject constructor(
 
                 if (canManageSale) {
                     // REALIZAR VENTA DIRECTA
-                    val saleItems = cartItems.map { product ->
-                        val quantity = itemQuantities[product.id.toString()] ?: 0
-                        val subTotal = product.attributes.product_price * quantity
-                        val netUnitPrice = product.attributes.product_price / 1.18
+                    val saleItems = cartItems.map { cartItem ->
+                        val product = cartItem.product
+                        val quantity = cartItem.quantity
+                        val subTotal = cartItem.subTotal
+                        val unitPrice = cartItem.unitPrice
+                        val netUnitPrice = unitPrice / 1.18
                         val taxAmount = subTotal - (netUnitPrice * quantity)
 
                         SaleItem(
                             productId = product.id,
                             quantity = quantity,
-                            productPrice = String.format("%.2f", product.attributes.product_price),
+                            productPrice = String.format("%.2f", unitPrice),
                             netUnitPrice = String.format("%.2f", netUnitPrice),
                             taxType = 1,
                             taxValue = "18.00",
@@ -258,7 +260,7 @@ class CheckoutViewModel @Inject constructor(
                             discountType = 2,
                             discountValue = "0.00",
                             discountAmount = "0.00",
-                            saleUnit = 1,
+                            saleUnit = cartItem.selectedConversion?.toUnitId ?: product.attributes.sale_unit_name.id,
                             subTotal = String.format("%.2f", subTotal)
                         )
                     }
@@ -290,16 +292,18 @@ class CheckoutViewModel @Inject constructor(
                     }
                 } else {
                     // REALIZAR COTIZACIÓN
-                    val quotationItems = cartItems.map { product ->
-                        val quantity = itemQuantities[product.id.toString()] ?: 0
-                        val subTotal = product.attributes.product_price * quantity
-                        val netUnitPrice = product.attributes.product_price / 1.18
+                    val quotationItems = cartItems.map { cartItem ->
+                        val product = cartItem.product
+                        val quantity = cartItem.quantity
+                        val subTotal = cartItem.subTotal
+                        val unitPrice = cartItem.unitPrice
+                        val netUnitPrice = unitPrice / 1.18
                         val taxAmount = subTotal - (netUnitPrice * quantity)
 
                         QuotationItem(
                             productId = product.id,
                             quantity = quantity,
-                            productPrice = String.format("%.2f", product.attributes.product_price),
+                            productPrice = String.format("%.2f", unitPrice),
                             netUnitPrice = String.format("%.2f", netUnitPrice),
                             taxType = 1,
                             taxValue = "18.00",
@@ -307,7 +311,7 @@ class CheckoutViewModel @Inject constructor(
                             discountType = 2,
                             discountValue = "0.00",
                             discountAmount = "0.00",
-                            saleUnit = 1,
+                            saleUnit = cartItem.selectedConversion?.toUnitId ?: product.attributes.sale_unit_name.id,
                             subTotal = String.format("%.2f", subTotal)
                         )
                     }

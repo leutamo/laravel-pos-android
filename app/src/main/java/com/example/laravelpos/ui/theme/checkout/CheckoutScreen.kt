@@ -367,7 +367,6 @@ fun CheckoutScreen(
                 Spacer(modifier = Modifier.width(16.dp))
                 // Datos del carrito desde HomeViewModel
                 val cartItems by homeViewModel.cartItems.collectAsState()
-                val itemQuantities by homeViewModel.itemQuantities.collectAsState()
 
                 Button(
                     onClick = {
@@ -375,8 +374,7 @@ fun CheckoutScreen(
                         checkoutViewModel.processCheckout(
                             totalAmount = totalAmount,
                             selectedReceiptType = selectedReceiptType,
-                            cartItems = cartItems,
-                            itemQuantities = itemQuantities
+                            cartItems = cartItems
                         )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Green),

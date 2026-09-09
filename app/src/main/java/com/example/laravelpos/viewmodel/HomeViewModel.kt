@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.laravelpos.data.model.Product
+import com.example.laravelpos.data.model.CartItem
+import com.example.laravelpos.data.model.ProductConversion
 import com.example.laravelpos.data.model.QuotationItem
 import com.example.laravelpos.data.model.QuotationRequest
 import com.example.laravelpos.data.repository.ProductRepository
@@ -48,17 +50,13 @@ class HomeViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    // Estado para los ítems del carrito
-    private val _cartItems = MutableStateFlow<List<Product>>(emptyList())
-    val cartItems: StateFlow<List<Product>> = _cartItems.asStateFlow() // Exponemos como StateFlow
+    // Estado para los ítems del carrito (Refactorizado a CartItem)
+    private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
+    val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
 
     // PAra completar la navegacion
     private val _navigateToSummary = MutableStateFlow<Int?>(null)
     val navigateToSummary: StateFlow<Int?> = _navigateToSummary.asStateFlow()
-
-    // Mapa para almacenar la cantidad de cada producto en el carrito
-    private val _itemQuantities = MutableStateFlow<Map<String, Int>>(emptyMap())
-    val itemQuantities: StateFlow<Map<String, Int>> = _itemQuantities.asStateFlow()
 
     // Para el modal de tipo de comprobante
     private val _selectedReceiptType = MutableStateFlow<String?>(null)
@@ -114,72 +112,60 @@ class HomeViewModel @Inject constructor(
 
     // Función para agregar un producto al carrito
     fun addItemToCart(product: Product) {
-        // Limpiamos la búsqueda al agregar un producto (Opción 1)
+        // Limpiamos la búsqueda al agregar un producto
         onSearchQueryChanged("")
 
         _cartItems.update { currentItems ->
-            // La condición `if (currentItems.any { it.id == product.id })`
-            // evita que un producto se añada a esta lista si ya existe.
-            // Por eso la lista de productos únicos no aumenta, causando el "mismatch".
-            if (currentItems.any { it.id == product.id }) {
-                currentItems
+            val existingItem = currentItems.find { it.product.id == product.id && it.selectedConversion == null }
+            if (existingItem != null) {
+                currentItems.map { 
+                    if (it === existingItem) it.copy(quantity = it.quantity + 1) else it 
+                }
             } else {
-                // Solo llegas a esta línea la primera vez que añades el producto.
-                currentItems + product
-            }
-        }
-        _itemQuantities.update { currentQuantities ->
-            val productIdAsString = product.id.toString() // Convertimos el ID a String
-            val currentCount = currentQuantities[productIdAsString] ?: 0
-            currentQuantities + (productIdAsString to currentCount + 1)
-        }
-    }
-
-    fun incrementProduct(product: Product) {
-        _itemQuantities.update { currentQuantities ->
-            val productIdAsString = product.id.toString() // Convertimos el ID a String
-            val currentCount = currentQuantities[productIdAsString] ?: 0
-            currentQuantities + (productIdAsString to currentCount + 1)
-        }
-    }
-
-    fun decrementProduct(product: Product) {
-        _itemQuantities.update { currentQuantities ->
-            val productIdAsString = product.id.toString() // Convertimos el ID a String
-            val currentCount = currentQuantities[productIdAsString] ?: 0
-            if (currentCount > 1) {
-                currentQuantities + (productIdAsString to currentCount - 1)
-            } else {
-                val newQuantities = currentQuantities.toMutableMap()
-                newQuantities.remove(productIdAsString) // Usamos el ID como String para eliminar
-                _cartItems.update { it.filter { item -> item.id.toString() != productIdAsString } } // Filtramos por ID como String
-                newQuantities
+                currentItems + CartItem(product, 1)
             }
         }
     }
 
-    // Esta función debe usar el ID del producto como String para buscar en el mapa
+    fun incrementProduct(cartItem: CartItem) {
+        _cartItems.update { currentItems ->
+            currentItems.map { 
+                if (it === cartItem) it.copy(quantity = it.quantity + 1) else it 
+            }
+        }
+    }
+
+    fun decrementProduct(cartItem: CartItem) {
+        _cartItems.update { currentItems ->
+            currentItems.mapNotNull { 
+                if (it === cartItem) {
+                    if (it.quantity > 1) it.copy(quantity = it.quantity - 1) else null
+                } else it 
+            }
+        }
+    }
+    
+    fun changeItemUnit(cartItem: CartItem, conversion: ProductConversion?) {
+        _cartItems.update { currentItems ->
+            currentItems.map { 
+                if (it === cartItem) it.copy(selectedConversion = conversion) else it 
+            }
+        }
+    }
+
+    // Compatibilidad para UI que busca por producto
     fun getProductCount(product: Product): Int {
-        return _itemQuantities.value[product.id.toString()] ?: 0 // Buscamos con el ID como String
+        return _cartItems.value.filter { it.product.id == product.id }.sumOf { it.quantity }
     }
 
-    // Esta función utiliza product.attributes.product_price que ya es Double
-    fun calculateItemTotal(product: Product): Double {
-        val count = getProductCount(product)
-        return product.attributes.product_price * count
+    // Esta función utiliza el subtotal calculado en CartItem
+    fun calculateItemTotal(cartItem: CartItem): Double {
+        return cartItem.subTotal
     }
 
     // Variables para calcular el total y el IGV
-    // Calculamos los totales. Aquí es importante que product_price sea Double
-    val totalAmount: StateFlow<Double> = combine(
-        cartItems, _itemQuantities
-    ) { items, quantities ->
-        items.sumOf { item ->
-            val productIdAsString =
-                item.id.toString() // Convertimos el ID a String para buscar en el mapa
-            val count = quantities[productIdAsString] ?: 0
-            item.attributes.product_price * count
-        }
+    val totalAmount: StateFlow<Double> = _cartItems.map { items ->
+        items.sumOf { it.subTotal }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -196,7 +182,6 @@ class HomeViewModel @Inject constructor(
 
     fun clearCart() {
         _cartItems.value = emptyList()
-        _itemQuantities.value = emptyMap()
     }
 
     /**
@@ -229,32 +214,32 @@ class HomeViewModel @Inject constructor(
             try {
                 // Obtener los datos del carrito
                 val items = _cartItems.value
-                val quantities = _itemQuantities.value
                 val currentTotal = totalAmount.value
                 val currentIgv = igvAmount.value
 
                 // Construir la lista de items para la petición
-                val quotationItems = items.map { product ->
-                    val quantity = quantities[product.id.toString()] ?: 0
-                    val subTotal = product.attributes.product_price * quantity
+                val quotationItems = items.map { cartItem ->
+                    val product = cartItem.product
+                    val quantity = cartItem.quantity
+                    val subTotal = cartItem.subTotal
+                    val unitPrice = cartItem.unitPrice
                     
                     // Calculamos el precio neto (sin IGV) para coincidir con la plataforma
-                    // Si el precio incluye IGV: neto = total / 1.18
-                    val netUnitPrice = product.attributes.product_price / 1.18
+                    val netUnitPrice = unitPrice / 1.18
                     val taxAmount = subTotal - (netUnitPrice * quantity)
 
                     QuotationItem(
                         productId = product.id,
                         quantity = quantity,
-                        productPrice = String.format("%.2f", product.attributes.product_price),
+                        productPrice = String.format("%.2f", unitPrice),
                         netUnitPrice = String.format("%.2f", netUnitPrice),
-                        taxType = 1, // 1 suele ser Gravado / con Impuesto
+                        taxType = 1, 
                         taxValue = "18.00",
                         taxAmount = String.format("%.2f", taxAmount),
                         discountType = 2,
                         discountValue = "0.00",
                         discountAmount = "0.00",
-                        saleUnit = 1,
+                        saleUnit = cartItem.selectedConversion?.toUnitId ?: product.attributes.sale_unit_name.id,
                         subTotal = String.format("%.2f", subTotal)
                     )
                 }
@@ -266,9 +251,9 @@ class HomeViewModel @Inject constructor(
                 // Construir el cuerpo de la petición basado en los screenshots
                 val requestBody = QuotationRequest(
                     date = currentDate,
-                    customerId = 6, // TODO: CAmbiar a un id de cliente dinámico (6 es el de la captura)
-                    warehouseId = 1, // TODO: CAmbiar a almacen dinámico
-                    status = 1, // 1 = Enviado / Activo
+                    customerId = 6, 
+                    warehouseId = 1, 
+                    status = 1, 
                     taxRate = "18.00",
                     taxAmount = String.format("%.2f", currentIgv),
                     discount = "0.00",
