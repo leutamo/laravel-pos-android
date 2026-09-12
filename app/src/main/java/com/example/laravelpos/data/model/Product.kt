@@ -135,13 +135,14 @@ data class ProductLinks(
 data class CartItem(
     val product: Product,
     val quantity: Int,
-    val selectedConversion: ProductConversion? = null
+    val selectedConversion: ProductConversion? = null,
+    val customPrice: Double? = null
 ) {
     val unitName: String
         get() = selectedConversion?.toUnitName ?: product.attributes.sale_unit_name.name
 
     val unitPrice: Double
-        get() = selectedConversion?.price ?: product.attributes.product_price
+        get() = customPrice ?: (selectedConversion?.price ?: product.attributes.product_price)
 
     val subTotal: Double
         get() = unitPrice * quantity

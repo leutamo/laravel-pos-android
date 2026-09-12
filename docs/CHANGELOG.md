@@ -28,6 +28,7 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
   - Añadidos logs de diagnóstico en `LoginRepository` y `SaleRepository` para depurar respuestas del servidor.
   - **Unificación de Resumen**: Corrección del error de campos faltantes al visualizar ventas directas mediante el uso del endpoint `/api/sales/{id}` y unificación de mapeo de ítems.
 - **UX/UI**:
+  - Modificación manual de precios unitarios directamente desde el carrito mediante un nuevo diálogo de edición.
   - Implementación de cambio de unidades (Cientos, Cajas, etc.) mediante deslizamiento a la derecha en el carrito.
   - Visualización de la unidad de venta real en la lista de productos.
   - Sincronización del buscador de productos entre pantallas.

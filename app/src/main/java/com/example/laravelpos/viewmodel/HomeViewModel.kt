@@ -148,7 +148,15 @@ class HomeViewModel @Inject constructor(
     fun changeItemUnit(cartItem: CartItem, conversion: ProductConversion?) {
         _cartItems.update { currentItems ->
             currentItems.map { 
-                if (it === cartItem) it.copy(selectedConversion = conversion) else it 
+                if (it === cartItem) it.copy(selectedConversion = conversion, customPrice = null) else it 
+            }
+        }
+    }
+
+    fun changeItemPrice(cartItem: CartItem, newPrice: Double?) {
+        _cartItems.update { currentItems ->
+            currentItems.map { 
+                if (it === cartItem) it.copy(customPrice = newPrice) else it
             }
         }
     }

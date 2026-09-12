@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -192,6 +193,7 @@ fun CartItemCard(cartItem: CartItem, homeViewModel: HomeViewModel) {
     val swipeToDismissState = rememberSwipeToDismissBoxState()
     
     var showUnitDialog by remember { mutableStateOf(false) }
+    var showPriceDialog by remember { mutableStateOf(false) }
 
     if (showUnitDialog) {
         UnitSelectionDialog(
@@ -200,6 +202,17 @@ fun CartItemCard(cartItem: CartItem, homeViewModel: HomeViewModel) {
             onUnitSelected = { conversion ->
                 homeViewModel.changeItemUnit(cartItem, conversion)
                 showUnitDialog = false
+            }
+        )
+    }
+
+    if (showPriceDialog) {
+        PriceEditDialog(
+            currentPrice = cartItem.unitPrice,
+            onDismiss = { showPriceDialog = false },
+            onPriceConfirmed = { newPrice ->
+                homeViewModel.changeItemPrice(cartItem, newPrice)
+                showPriceDialog = false
             }
         )
     }
@@ -277,11 +290,24 @@ fun CartItemCard(cartItem: CartItem, homeViewModel: HomeViewModel) {
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = "Precio Unit: S/ ${String.format("%.2f", cartItem.unitPrice)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Precio Unit: S/ ${String.format("%.2f", cartItem.unitPrice)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray
+                        )
+                        IconButton(
+                            onClick = { showPriceDialog = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Editar Precio",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     Text(
                         text = "Total: S/ ${String.format("%.2f", cartItem.subTotal)}",
                         style = MaterialTheme.typography.bodyLarge,
@@ -366,6 +392,58 @@ fun UnitSelectionDialog(
             }
         },
         confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+fun PriceEditDialog(
+    currentPrice: Double,
+    onDismiss: () -> Unit,
+    onPriceConfirmed: (Double) -> Unit
+) {
+    var priceText by remember { mutableStateOf(String.format("%.2f", currentPrice)) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Precio Unitario") },
+        text = {
+            Column {
+                Text("Ingrese el nuevo precio para este producto:")
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { 
+                        // Solo permitir números y un punto decimal
+                        if (it.isEmpty() || it.toDoubleOrNull() != null || it == ".") {
+                            priceText = it 
+                        }
+                    },
+                    label = { Text("Precio (S/)") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val newPrice = priceText.toDoubleOrNull()
+                    if (newPrice != null && newPrice >= 0) {
+                        onPriceConfirmed(newPrice)
+                    }
+                }
+            ) {
+                Text("Actualizar")
+            }
+        },
+        dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancelar")
             }
