@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 data class QuotationItem(
     @SerialName("product_id") val productId: Int,
-    @SerialName("quantity") val quantity: Int,
+    @SerialName("quantity") val quantity: Double,
     @SerialName("product_price") val productPrice: String,
     @SerialName("net_unit_price") val netUnitPrice: String,
     @SerialName("tax_type") val taxType: Int,
@@ -97,7 +97,7 @@ data class QuotationItemResponse(
     @SerialName("discount_value") val discountValue: Double,
     @SerialName("discount_amount") val discountAmount: Double,
     @SerialName("sale_unit") val saleUnit: SaleUnit,
-    val quantity: Int,
+    val quantity: Double,
     @SerialName("sub_total") val subTotal: Double,
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String

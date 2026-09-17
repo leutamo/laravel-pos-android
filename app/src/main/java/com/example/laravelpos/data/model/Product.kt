@@ -54,7 +54,7 @@ data class ProductAttributes(
     val stock: Stock?,
     val warehouse: List<Warehouse>,
     val barcode_url: String,
-    val in_stock: Int,
+    val in_stock: Double,
     val variation_product: VariationProduct? = null,
     val conversions: List<ProductConversion> = emptyList()
 )
@@ -104,7 +104,7 @@ data class Stock(
     val id: Int,
     val warehouse_id: Int,
     val product_id: Int,
-    val quantity: Int,
+    val quantity: Double,
     val created_at: String,
     val updated_at: String,
     val alert: Int
@@ -112,7 +112,7 @@ data class Stock(
 
 @Serializable
 data class Warehouse(
-    val total_quantity: Int,
+    val total_quantity: Double,
     val name: String
 )
 
@@ -134,7 +134,7 @@ data class ProductLinks(
 @Serializable
 data class CartItem(
     val product: Product,
-    val quantity: Int,
+    val quantity: Double,
     val selectedConversion: ProductConversion? = null,
     val customPrice: Double? = null
 ) {

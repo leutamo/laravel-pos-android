@@ -15,7 +15,7 @@ data class SaleItem(
     @SerialName("discount_value") val discountValue: String,
     @SerialName("discount_amount") val discountAmount: String,
     @SerialName("sale_unit") val saleUnit: Int,
-    @SerialName("quantity") val quantity: Int,
+    @SerialName("quantity") val quantity: Double,
     @SerialName("sub_total") val subTotal: String
 )
 

@@ -194,6 +194,7 @@ fun CartItemCard(cartItem: CartItem, homeViewModel: HomeViewModel) {
     
     var showUnitDialog by remember { mutableStateOf(false) }
     var showPriceDialog by remember { mutableStateOf(false) }
+    var showQuantityDialog by remember { mutableStateOf(false) }
 
     if (showUnitDialog) {
         UnitSelectionDialog(
@@ -213,6 +214,18 @@ fun CartItemCard(cartItem: CartItem, homeViewModel: HomeViewModel) {
             onPriceConfirmed = { newPrice ->
                 homeViewModel.changeItemPrice(cartItem, newPrice)
                 showPriceDialog = false
+            }
+        )
+    }
+
+    if (showQuantityDialog) {
+        QuantityEditDialog(
+            currentQuantity = cartItem.quantity,
+            unitName = cartItem.unitName,
+            onDismiss = { showQuantityDialog = false },
+            onQuantityConfirmed = { newQty ->
+                homeViewModel.changeItemQuantity(cartItem, newQty)
+                showQuantityDialog = false
             }
         )
     }
@@ -324,11 +337,22 @@ fun CartItemCard(cartItem: CartItem, homeViewModel: HomeViewModel) {
                     IconButton(onClick = { homeViewModel.incrementProduct(cartItem) }) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = "Añadir")
                     }
-                    Text(
-                        text = "${cartItem.quantity}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Surface(
+                        onClick = { showQuantityDialog = true },
+                        color = Color.Transparent,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = if (cartItem.quantity % 1.0 == 0.0) 
+                                String.format("%.0f", cartItem.quantity) 
+                            else 
+                                String.format("%.2f", cartItem.quantity),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                    }
                     IconButton(onClick = { homeViewModel.decrementProduct(cartItem) }) {
                         Icon(imageVector = Icons.Default.Delete, contentDescription = "Quitar")
                     }
@@ -437,6 +461,77 @@ fun PriceEditDialog(
                     val newPrice = priceText.toDoubleOrNull()
                     if (newPrice != null && newPrice >= 0) {
                         onPriceConfirmed(newPrice)
+                    }
+                }
+            ) {
+                Text("Actualizar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+fun QuantityEditDialog(
+    currentQuantity: Double,
+    unitName: String,
+    onDismiss: () -> Unit,
+    onQuantityConfirmed: (Double) -> Unit
+) {
+    val isUnitOnly = unitName.equals("Unidad", ignoreCase = true) || unitName.equals("Unid.", ignoreCase = true)
+    
+    var qtyText by remember {
+        mutableStateOf(
+            if (currentQuantity % 1.0 == 0.0) String.format("%.0f", currentQuantity) 
+            else String.format("%.2f", currentQuantity)
+        ) 
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Cantidad") },
+        text = {
+            Column {
+                Text(
+                    if (isUnitOnly) "Ingrese la cantidad (solo números enteros):"
+                    else "Ingrese la cantidad (puede usar decimales):"
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = qtyText,
+                    onValueChange = { input ->
+                        if (isUnitOnly) {
+                            // Solo permitir números enteros
+                            if (input.isEmpty() || input.all { it.isDigit() }) {
+                                qtyText = input
+                            }
+                        } else {
+                            // Permitir números y un punto decimal
+                            if (input.isEmpty() || input.toDoubleOrNull() != null || input == ".") {
+                                qtyText = input 
+                            }
+                        }
+                    },
+                    label = { Text("Cantidad ($unitName)") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = if (isUnitOnly) androidx.compose.ui.text.input.KeyboardType.Number 
+                                       else androidx.compose.ui.text.input.KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val newQty = qtyText.toDoubleOrNull()
+                    if (newQty != null && newQty > 0) {
+                        onQuantityConfirmed(newQty)
                     }
                 }
             ) {

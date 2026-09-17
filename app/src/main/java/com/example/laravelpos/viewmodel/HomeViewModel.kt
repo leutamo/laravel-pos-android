@@ -116,13 +116,13 @@ class HomeViewModel @Inject constructor(
         onSearchQueryChanged("")
 
         _cartItems.update { currentItems ->
-            val existingItem = currentItems.find { it.product.id == product.id && it.selectedConversion == null }
+            val existingItem = currentItems.find { it.product.id == product.id && it.selectedConversion == null && it.customPrice == null }
             if (existingItem != null) {
                 currentItems.map { 
-                    if (it === existingItem) it.copy(quantity = it.quantity + 1) else it 
+                    if (it === existingItem) it.copy(quantity = it.quantity + 1.0) else it 
                 }
             } else {
-                currentItems + CartItem(product, 1)
+                currentItems + CartItem(product, 1.0)
             }
         }
     }
@@ -130,7 +130,7 @@ class HomeViewModel @Inject constructor(
     fun incrementProduct(cartItem: CartItem) {
         _cartItems.update { currentItems ->
             currentItems.map { 
-                if (it === cartItem) it.copy(quantity = it.quantity + 1) else it 
+                if (it === cartItem) it.copy(quantity = it.quantity + 1.0) else it 
             }
         }
     }
@@ -139,7 +139,7 @@ class HomeViewModel @Inject constructor(
         _cartItems.update { currentItems ->
             currentItems.mapNotNull { 
                 if (it === cartItem) {
-                    if (it.quantity > 1) it.copy(quantity = it.quantity - 1) else null
+                    if (it.quantity > 1.0) it.copy(quantity = it.quantity - 1.0) else null
                 } else it 
             }
         }
@@ -156,19 +156,22 @@ class HomeViewModel @Inject constructor(
     fun changeItemPrice(cartItem: CartItem, newPrice: Double?) {
         _cartItems.update { currentItems ->
             currentItems.map { 
-                if (it === cartItem) it.copy(customPrice = newPrice) else it
+                if (it === cartItem) it.copy(customPrice = newPrice) else it 
+            }
+        }
+    }
+
+    fun changeItemQuantity(cartItem: CartItem, newQuantity: Double) {
+        _cartItems.update { currentItems ->
+            currentItems.map { 
+                if (it === cartItem) it.copy(quantity = newQuantity) else it 
             }
         }
     }
 
     // Compatibilidad para UI que busca por producto
-    fun getProductCount(product: Product): Int {
+    fun getProductCount(product: Product): Double {
         return _cartItems.value.filter { it.product.id == product.id }.sumOf { it.quantity }
-    }
-
-    // Esta función utiliza el subtotal calculado en CartItem
-    fun calculateItemTotal(cartItem: CartItem): Double {
-        return cartItem.subTotal
     }
 
     // Variables para calcular el total y el IGV

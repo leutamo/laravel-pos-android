@@ -299,7 +299,7 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                                             maxLines = 2
                                         )
                                         Text(
-                                            text = "Stock: ${product.attributes.stock?.quantity}",
+                                            text = "Stock: ${product.attributes.stock?.quantity?.let { if (it % 1.0 == 0.0) String.format("%.0f", it) else it.toString() } ?: "0"}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color.Gray
                                         )
