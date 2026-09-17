@@ -23,12 +23,16 @@ Este archivo documenta los hitos y cambios importantes realizados en la aplicaci
 
 ### Mejoras y Fixes
 - **Robustez de API**:
+  - Soporte para **Stock Decimal**: corrección de cierres inesperados (Unexpected JSON token) al recibir stock fraccionado desde el servidor.
   - Manejo de campos nulos en `order_tax`, `tax_type` y `last_name` para evitar cierres inesperados.
   - Implementación de `ProductImagesSerializer` para manejar inconsistencias en el formato de imágenes (Array vs Object).
   - Añadidos logs de diagnóstico en `LoginRepository` y `SaleRepository` para depurar respuestas del servidor.
   - **Unificación de Resumen**: Corrección del error de campos faltantes al visualizar ventas directas mediante el uso del endpoint `/api/sales/{id}` y unificación de mapeo de ítems.
 - **UX/UI**:
+  - Soporte para **Ventas Fraccionadas**: posibilidad de vender medio ciento (0.5), un cuarto de kilo, etc., mediante cantidades decimales.
+  - Edición manual de cantidades en el carrito con teclado dinámico y validación por tipo de unidad (bloqueo de decimales para 'Unidad').
   - Modificación manual de precios unitarios directamente desde el carrito mediante un nuevo diálogo de edición.
+  - Indicadores visuales (bordes de botón) en campos editables del carrito.
   - Implementación de cambio de unidades (Cientos, Cajas, etc.) mediante deslizamiento a la derecha en el carrito.
   - Visualización de la unidad de venta real en la lista de productos.
   - Sincronización del buscador de productos entre pantallas.
