@@ -249,7 +249,8 @@ fun CheckoutScreen(
                         onValueChange = { checkoutViewModel.updateDni(it) }, // ✅ Actualiza en ViewModel
                         label = { Text(selectedDocType?.name ?: "DNI/RUC") },
                         modifier = Modifier.weight(1f),
-                        enabled = isDniFieldEnabled && !isLoadingCustomer // Bloqueo hasta seleccionar tipo y durante carga
+                        enabled = isDniFieldEnabled && !isLoadingCustomer, // Bloqueo hasta seleccionar tipo y durante carga
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { checkoutViewModel.selectGenericCustomer() }) {
