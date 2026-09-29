@@ -76,10 +76,17 @@ class LoginRepository @Inject constructor(
                         
                         Log.d("LoginRepository", "Profile parsed successfully. Role: $roleName")
                         
-                        sharedPreferences.edit()
+                        val editor = sharedPreferences.edit()
                             .putString("user_name", userAttributes.firstName)
                             .putString("user_role", roleName)
-                            .apply()
+                        
+                        val defaultCompany = userAttributes.defaultCompany
+                        if (defaultCompany != null) {
+                            editor.putInt("active_company_id", defaultCompany.id)
+                                .putString("active_company_name", defaultCompany.name)
+                                .putString("active_company_ruc", defaultCompany.ruc ?: "")
+                        }
+                        editor.apply()
                         true
                     } catch (parseError: Exception) {
                         Log.e("LoginRepository", "JSON parsing error in profile: ${parseError.message}", parseError)

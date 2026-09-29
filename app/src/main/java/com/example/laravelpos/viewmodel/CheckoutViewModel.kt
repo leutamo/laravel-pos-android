@@ -12,6 +12,7 @@ import com.example.laravelpos.data.model.QuotationItem
 import com.example.laravelpos.data.model.QuotationRequest
 import com.example.laravelpos.data.model.SaleItem
 import com.example.laravelpos.data.model.SaleRequest
+import com.example.laravelpos.data.repository.BillingCompanyRepository
 import com.example.laravelpos.data.repository.CustomerRepository
 import com.example.laravelpos.data.repository.CustomerResult
 import com.example.laravelpos.data.repository.DocumentTypeRepository
@@ -39,7 +40,8 @@ class CheckoutViewModel @Inject constructor(
     private val quotationRepository: QuotationRepository,
     private val customerRepository: CustomerRepository,
     private val saleRepository: SaleRepository,
-    private val loginRepository: LoginRepository
+    private val loginRepository: LoginRepository,
+    private val billingCompanyRepository: BillingCompanyRepository
 ) : ViewModel() {
 
     // Estado para tipos de documento
@@ -221,6 +223,9 @@ class CheckoutViewModel @Inject constructor(
         _navigateToSummary.value = null
     }
 
+    fun getActiveCompanyName(): String? = billingCompanyRepository.getSavedActiveCompanyName()
+    fun getActiveCompanyRuc(): String? = billingCompanyRepository.getSavedActiveCompanyRuc()
+
     // Lógica de procesar checkout
     fun processCheckout(
         totalAmount: Double,
@@ -265,10 +270,14 @@ class CheckoutViewModel @Inject constructor(
                         )
                     }
 
+                    val activeCompanyId = billingCompanyRepository.getSavedActiveCompanyId()
+                    val companyId = if (activeCompanyId > 0) activeCompanyId else null
+
                     val request = SaleRequest(
                         date = currentDate,
                         customerId = customerId,
                         warehouseId = 1,
+                        companyId = companyId,
                         taxRate = "18.00",
                         taxAmount = String.format("%.2f", totalIgv),
                         discount = "0.00",

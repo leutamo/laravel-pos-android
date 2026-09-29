@@ -59,10 +59,19 @@ data class UserProfileData(
 )
 
 @Serializable
+data class UserDefaultCompany(
+    val id: Int,
+    val name: String,
+    val ruc: String? = null
+)
+
+@Serializable
 data class UserAttributes(
     @SerialName("first_name") val firstName: String,
     @SerialName("last_name") val lastName: String? = null,
     val email: String,
     val phone: String? = null,
-    val role: List<Role> = emptyList()
+    val role: List<Role> = emptyList(),
+    @SerialName("default_company_id") val defaultCompanyId: Int? = null,
+    @SerialName("default_company") val defaultCompany: UserDefaultCompany? = null
 )

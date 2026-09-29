@@ -16,11 +16,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Info
@@ -29,7 +31,10 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,6 +45,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDrawerState
@@ -55,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -67,7 +74,6 @@ import com.example.laravelpos.viewmodel.LoginViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Se ha movido la constante TAG a nivel de archivo para evitar errores
 private const val TAG = "HomeScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,6 +86,11 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
     val apiError by homeViewModel.apiError.collectAsState()
     val isLoading by homeViewModel.isLoading.collectAsState()
 
+    val billingCompanies by viewModel.billingCompanies.collectAsState()
+    val activeCompany by viewModel.activeCompany.collectAsState()
+    val isLoadingCompanies by viewModel.isLoadingCompanies.collectAsState()
+    val companyError by viewModel.companyError.collectAsState()
+
     val cartItems by homeViewModel.cartItems.collectAsState()
     val cartItemCount = cartItems.size
 
@@ -89,7 +100,6 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
     var searchText by remember { mutableStateOf(TextFieldValue(searchQuery)) }
     
     // Sincronizar el estado local del TextField con el ViewModel
-    // Útil cuando el ViewModel limpia la búsqueda (ej: al agregar al carrito)
     LaunchedEffect(searchQuery) {
         if (searchQuery != searchText.text) {
             searchText = TextFieldValue(searchQuery)
@@ -133,9 +143,134 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        fontWeight = FontWeight.Bold
                     )
                 }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                // ✅ Selector de Empresa de Facturación
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    Text(
+                        text = "Empresa Emisora:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (isLoadingCompanies && billingCompanies.isEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Cargando empresas...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else if (billingCompanies.isNotEmpty()) {
+                        var expandedCompanyMenu by remember { mutableStateOf(false) }
+
+                        Box {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { expandedCompanyMenu = true },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = activeCompany?.name ?: "Seleccionar Empresa",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            activeCompany?.ruc?.let { ruc ->
+                                                if (ruc.isNotEmpty()) {
+                                                    Text(
+                                                        text = "RUC: $ruc",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = Color.Gray
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = "Cambiar empresa"
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = expandedCompanyMenu,
+                                onDismissRequest = { expandedCompanyMenu = false }
+                            ) {
+                                billingCompanies.forEach { company ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = company.name,
+                                                    fontWeight = if (company.id == activeCompany?.id) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                                if (!company.ruc.isNullOrEmpty()) {
+                                                    Text(
+                                                        text = "RUC: ${company.ruc}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = Color.Gray
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        onClick = {
+                                            viewModel.selectActiveCompany(company)
+                                            expandedCompanyMenu = false
+                                        },
+                                        leadingIcon = {
+                                            RadioButton(
+                                                selected = (company.id == activeCompany?.id),
+                                                onClick = null
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = activeCompany?.name ?: "Sin empresas registradas",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    if (companyError != null) {
+                        Text(
+                            text = companyError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Red,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 NavigationDrawerItem(
@@ -255,7 +390,7 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                     scope.launch {
                         isRefreshing = true
                         homeViewModel.fetchProducts()
-                        delay(1000) // Small delay for visual feedback
+                        delay(1000)
                         isRefreshing = false
                     }
                 },
@@ -355,9 +490,6 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
 @Preview(showBackground = true)
 @Composable
 fun PreviewHomeScreen() {
-    // You'll need to provide mock data for the preview
-    // as it doesn't have access to the ViewModel or NavController
-    // This is a simplified example to show the layout
     Column(modifier = Modifier.fillMaxSize()) {
 
         OutlinedTextField(
@@ -446,5 +578,3 @@ fun PreviewHomeScreen() {
         }
     }
 }
-
-
