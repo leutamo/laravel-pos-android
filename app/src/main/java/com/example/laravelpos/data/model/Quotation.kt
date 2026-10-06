@@ -57,10 +57,23 @@ data class QuotationData(
 )
 
 @Serializable
+data class ElectronicDocumentData(
+    val id: Int? = null,
+    @SerialName("sale_id") val saleId: Int? = null,
+    @SerialName("document_type") val documentType: String? = null,
+    val series: String? = null,
+    val correlative: Int? = null,
+    @SerialName("full_number") val fullNumber: String? = null,
+    @SerialName("sunat_status") val sunatStatus: String? = null,
+    @SerialName("pdf_url") val pdfUrl: String? = null
+)
+
+@Serializable
 data class QuotationAttributes(
     val date: String,
     @SerialName("customer_id") val customerId: Int,
     @SerialName("customer_name") val customerName: String,
+    @SerialName("customer_phone") val customerPhone: String? = null,
     @SerialName("warehouse_id") val warehouseId: Int,
     @SerialName("warehouse_name") val warehouseName: String,
     @SerialName("tax_rate") val taxRate: Double,
@@ -76,6 +89,7 @@ data class QuotationAttributes(
     @SerialName("reference_code") val referenceCode: String,
     @SerialName("quotation_items") val quotationItems: List<QuotationItemResponse>? = null,
     @SerialName("sale_items") val saleItems: List<QuotationItemResponse>? = null, // Para ventas directas
+    @SerialName("electronic_document") val electronicDocument: ElectronicDocumentData? = null,
     @SerialName("created_at") val createdAt: String
 ) {
     // Propiedad calculada para obtener los ítems sin importar el nombre del campo
