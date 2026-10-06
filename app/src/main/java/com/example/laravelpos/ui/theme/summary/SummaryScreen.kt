@@ -2,6 +2,7 @@ package com.example.laravelpos.ui.theme.summary
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +41,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,11 +52,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.laravelpos.viewmodel.CheckoutViewModel
 import com.example.laravelpos.viewmodel.HomeViewModel
 import com.example.laravelpos.viewmodel.SummaryViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,12 +80,14 @@ fun SummaryScreen(
     val quotation = state.quotation
     val customerData by checkoutViewModel.customerData.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(id, type) {
         summaryViewModel.loadData(type, id)
     }
 
     var phoneText by remember { mutableStateOf("") }
+    var isSendingWhatsapp by remember { mutableStateOf(false) }
 
     // Auto-poblar número de teléfono si el cliente lo tiene registrado
     LaunchedEffect(customerData, quotation) {
@@ -253,49 +264,111 @@ fun SummaryScreen(
                         Button(
                             onClick = {
                                 var cleanPhone = phoneText.trim().replace(" ", "").replace("-", "")
-                                if (cleanPhone.isNotEmpty()) {
-                                    // Anteponer 51 si tiene 9 dígitos (Perú)
-                                    if (cleanPhone.length == 9 && !cleanPhone.startsWith("+") && !cleanPhone.startsWith("51")) {
-                                        cleanPhone = "51$cleanPhone"
-                                    }
-                                    val refCode = attr.referenceCode
-                                    val grandTotal = String.format("%.2f", attr.grandTotal)
-                                    val fullNum = attr.electronicDocument?.fullNumber
-                                    val docInfo = if (!fullNum.isNullOrEmpty()) " ($fullNum)" else ""
-                                    val pdfUrl = attr.electronicDocument?.pdfUrl ?: ""
-
-                                    val message = if (!pdfUrl.isNullOrEmpty()) {
-                                        "Hola, le enviamos su comprobante de venta$docInfo (#$refCode) por un total de S/ $grandTotal.\n\nVer comprobante PDF: $pdfUrl"
-                                    } else {
-                                        "Hola, le enviamos la información de su compra$docInfo (#$refCode) por un total de S/ $grandTotal. ¡Gracias por su preferencia!"
-                                    }
-
-                                    try {
-                                        val encodedMsg = URLEncoder.encode(message, "UTF-8")
-                                        val intent = Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse("https://api.whatsapp.com/send?phone=$cleanPhone&text=$encodedMsg")
-                                        )
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Error al abrir WhatsApp: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
+                                if (cleanPhone.isEmpty()) {
                                     Toast.makeText(context, "Por favor ingrese un número de teléfono", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+
+                                if (cleanPhone.length == 9 && !cleanPhone.startsWith("+") && !cleanPhone.startsWith("51")) {
+                                    cleanPhone = "51$cleanPhone"
+                                }
+
+                                val refCode = attr.referenceCode
+                                val grandTotal = String.format("%.2f", attr.grandTotal)
+                                val fullNum = attr.electronicDocument?.fullNumber
+                                val docInfo = if (!fullNum.isNullOrEmpty()) " ($fullNum)" else ""
+                                val rawPdfUrl = attr.electronicDocument?.pdfUrl ?: ""
+
+                                val message = "Hola, le enviamos su comprobante de venta$docInfo (#$refCode) por un total de S/ $grandTotal. ¡Gracias por su preferencia!"
+
+                                scope.launch {
+                                    isSendingWhatsapp = true
+                                    try {
+                                        var contentUri: Uri? = null
+
+                                        if (!rawPdfUrl.isNullOrEmpty()) {
+                                            withContext(Dispatchers.IO) {
+                                                try {
+                                                    val url = URL(rawPdfUrl)
+                                                    val connection = url.openConnection() as HttpURLConnection
+                                                    connection.connectTimeout = 8000
+                                                    connection.readTimeout = 8000
+                                                    connection.connect()
+
+                                                    if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                                                        val file = File(context.cacheDir, "Comprobante_${refCode}.pdf")
+                                                        file.outputStream().use { output ->
+                                                            connection.inputStream.use { input ->
+                                                                input.copyTo(output)
+                                                            }
+                                                        }
+                                                        contentUri = FileProvider.getUriForFile(
+                                                            context,
+                                                            "${context.packageName}.fileprovider",
+                                                            file
+                                                        )
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Log.e("SummaryScreen", "Error descargando PDF: ${e.message}")
+                                                }
+                                            }
+                                        }
+
+                                        if (contentUri != null) {
+                                            // Enviar con archivo PDF adjunto
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                putExtra(Intent.EXTRA_STREAM, contentUri)
+                                                putExtra(Intent.EXTRA_TEXT, message)
+                                                putExtra("jid", "$cleanPhone@s.whatsapp.net")
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            shareIntent.type = "application/pdf"
+                                            try {
+                                                context.startActivity(shareIntent)
+                                            } catch (e: Exception) {
+                                                val chooser = Intent.createChooser(shareIntent, "Enviar comprobante por WhatsApp")
+                                                context.startActivity(chooser)
+                                            }
+                                        } else {
+                                            // Fallback con URL en texto
+                                            val fullMsg = if (!rawPdfUrl.isNullOrEmpty()) "$message\n\nVer PDF: $rawPdfUrl" else message
+                                            val encodedMsg = URLEncoder.encode(fullMsg, "UTF-8")
+                                            val intent = Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse("https://api.whatsapp.com/send?phone=$cleanPhone&text=$encodedMsg")
+                                            )
+                                            context.startActivity(intent)
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Error al enviar por WhatsApp: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        isSendingWhatsapp = false
+                                    }
                                 }
                             },
+                            enabled = !isSendingWhatsapp,
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)) // Verde WhatsApp
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Send,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Enviar", fontWeight = FontWeight.Bold, color = Color.White)
+                                if (isSendingWhatsapp) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Enviando...", fontWeight = FontWeight.Bold, color = Color.White)
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Enviar", fontWeight = FontWeight.Bold, color = Color.White)
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.width(16.dp))
