@@ -396,86 +396,112 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 },
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Product grid
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filteredProducts, key = { it.id }) { product ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    homeViewModel.addItemToCart(product)
-                                },
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                if (isLoading && filteredProducts.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Column(
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(44.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Cargando productos...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    // Product grid
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(filteredProducts, key = { it.id }) { product ->
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(8.dp)
+                                    .clickable {
+                                        homeViewModel.addItemToCart(product)
+                                    },
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    AsyncImage(
-                                        model = homeViewModel.getFullImageUrl(product.attributes.images?.imageUrls?.firstOrNull()),
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(60.dp)
-                                            .padding(end = 8.dp)
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        AsyncImage(
+                                            model = homeViewModel.getFullImageUrl(product.attributes.images?.imageUrls?.firstOrNull()),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(60.dp)
+                                                .padding(end = 8.dp)
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = product.attributes.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 2
+                                            )
+                                            Text(
+                                                text = "Stock: ${product.attributes.stock?.quantity?.let { if (it % 1.0 == 0.0) String.format("%.0f", it) else it.toString() } ?: "0"}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Color.Gray
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider()
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
                                         Text(
-                                            text = product.attributes.name,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            maxLines = 2
+                                            text = product.attributes.sale_unit_name.name.uppercase(),
+                                            style = MaterialTheme.typography.labelSmall
                                         )
                                         Text(
-                                            text = "Stock: ${product.attributes.stock?.quantity?.let { if (it % 1.0 == 0.0) String.format("%.0f", it) else it.toString() } ?: "0"}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Color.Gray
+                                            text = "S/ ${product.attributes.product_price}",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                HorizontalDivider()
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = product.attributes.sale_unit_name.name.uppercase(),
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                    Text(
-                                        text = "S/ ${product.attributes.product_price}",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
                             }
                         }
-                    }
-                    if (filteredProducts.isEmpty() && !isLoading) {
-                        item(span = { GridItemSpan(2) }) {
-                            Column(
-                                modifier = Modifier.fillMaxSize().padding(top = 100.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = apiError ?: "No se encontraron productos",
-                                    modifier = Modifier.padding(16.dp),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (apiError != null) Color.Red else Color.Gray,
-                                    textAlign = TextAlign.Center
-                                )
-                                Button(onClick = { homeViewModel.fetchProducts() }) {
-                                    Text("Actualizar")
+                        if (filteredProducts.isEmpty() && !isLoading) {
+                            item(span = { GridItemSpan(2) }) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize().padding(top = 100.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = apiError ?: "No se encontraron productos",
+                                        modifier = Modifier.padding(16.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (apiError != null) Color.Red else Color.Gray,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Button(onClick = { homeViewModel.fetchProducts() }) {
+                                        Text("Actualizar")
+                                    }
                                 }
                             }
                         }

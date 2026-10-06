@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -66,7 +67,7 @@ class HomeViewModel @Inject constructor(
     val showReceiptModal: StateFlow<Boolean> = _showReceiptModal.asStateFlow()
 
     // Estados para la llamada a la API
-    private val _isLoading = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _apiError = MutableStateFlow<String?>(null)
@@ -76,13 +77,17 @@ class HomeViewModel @Inject constructor(
     val filteredProducts: StateFlow<List<Product>> = _products.asStateFlow()
 
     init {
-        Log.d(TAG, "ViewModel initialized, starting search observer")
-        // Escuchar cambios en la búsqueda con debounce (evita peticiones excesivas)
+        Log.d(TAG, "ViewModel initialized, fetching initial products")
+        fetchProducts("")
+
         @OptIn(FlowPreview::class)
         viewModelScope.launch {
-            searchQuery.debounce(500).collect { query ->
-                fetchProducts(query)
-            }
+            searchQuery
+                .drop(1)
+                .debounce(500)
+                .collect { query ->
+                    fetchProducts(query)
+                }
         }
     }
 
