@@ -65,12 +65,32 @@ class LoginViewModel @Inject constructor(
     private val _companyError = MutableStateFlow<String?>(null)
     val companyError: StateFlow<String?> = _companyError.asStateFlow()
 
+    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+        if (key == TOKEN_KEY) {
+            val hasToken = sp.getString(TOKEN_KEY, null) != null
+            _isAuthenticated.value = hasToken
+            if (!hasToken) {
+                _userName.value = null
+                _userRole.value = null
+                _userPermissions.value = emptyList()
+                _activeCompany.value = null
+                _billingCompanies.value = emptyList()
+            }
+        }
+    }
+
     init {
+        sharedPreferences.registerOnSharedPreferenceChangeListener(prefListener)
         // Al iniciar, si está autenticado, refrescamos el perfil para tener el rol actualizado
         if (isLoggedIn()) {
             refreshProfile()
             loadBillingCompanies()
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        sharedPreferences.unregisterOnSharedPreferenceChangeListener(prefListener)
     }
 
     fun loadBillingCompanies() {

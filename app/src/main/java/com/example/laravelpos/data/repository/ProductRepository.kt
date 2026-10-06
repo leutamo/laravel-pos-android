@@ -64,11 +64,8 @@ class ProductRepository @Inject constructor(
                             "Error del servidor (${response.status.value})"
                         }
 
-                        if (errorMessage == "Unauthenticated.") {
-                            with(sharedPreferences.edit()) {
-                                remove(TOKEN_KEY)
-                                apply()
-                            }
+                        if (errorMessage == "Unauthenticated." || response.status.value == 401) {
+                            sharedPreferences.edit().remove(TOKEN_KEY).apply()
                         }
                         Result.failure(Exception(errorMessage))
                     }
