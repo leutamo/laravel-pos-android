@@ -1,5 +1,6 @@
 package com.example.laravelpos.ui.theme.summary
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -55,12 +56,14 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.laravelpos.data.config.ServerConfig
 import com.example.laravelpos.viewmodel.CheckoutViewModel
 import com.example.laravelpos.viewmodel.HomeViewModel
 import com.example.laravelpos.viewmodel.SummaryViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -281,7 +284,7 @@ fun SummaryScreen(
                                 val grandTotal = String.format("%.2f", attr.grandTotal)
                                 val elecDoc = attr.electronicDocument
 
-                                // Construcción del mensaje adaptado al tipo de documento
+                                // Construcción del mensaje
                                 val message = if (elecDoc != null) {
                                     val fullNum = elecDoc.fullNumber ?: ""
                                     "Hola, le enviamos su Comprobante de Venta $fullNum (#$refCode) por S/ $grandTotal. ¡Gracias por su preferencia!"
@@ -289,16 +292,6 @@ fun SummaryScreen(
                                     "Hola, le enviamos su Nota de Venta #$refCode por S/ $grandTotal. ¡Gracias por su preferencia!"
                                 } else {
                                     "Hola, le enviamos su Cotización #$refCode por S/ $grandTotal. ¡Gracias por su preferencia!"
-                                }
-
-                                // Determinación de la URL del PDF a descargar
-                                val baseUrl = summaryViewModel.serverConfig.getBaseUrl()
-                                val pdfUrlToUse = if (elecDoc != null && !elecDoc.pdfUrl.isNullOrBlank()) {
-                                    summaryViewModel.serverConfig.getFullImageUrl(elecDoc.pdfUrl)
-                                } else if (type == "sale") {
-                                    "${baseUrl}sales/${quotation.id}/sunat-pdf"
-                                } else {
-                                    "${baseUrl}quotations/${quotation.id}"
                                 }
 
                                 // Detectar WhatsApp o WhatsApp Business instalado
@@ -317,39 +310,15 @@ fun SummaryScreen(
                                 scope.launch {
                                     isSendingWhatsapp = true
                                     try {
-                                        var contentUri: Uri? = null
-
-                                        withContext(Dispatchers.IO) {
-                                            try {
-                                                val url = URL(pdfUrlToUse)
-                                                val connection = url.openConnection() as HttpURLConnection
-                                                connection.connectTimeout = 8000
-                                                connection.readTimeout = 8000
-                                                val token = summaryViewModel.getAuthToken()
-                                                if (!token.isNullOrEmpty()) {
-                                                    connection.setRequestProperty("Authorization", "Bearer $token")
-                                                }
-                                                connection.connect()
-
-                                                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                                                    val file = File(context.cacheDir, "Documento_${refCode}.pdf")
-                                                    file.outputStream().use { output ->
-                                                        connection.inputStream.use { input ->
-                                                            input.copyTo(output)
-                                                        }
-                                                    }
-                                                    contentUri = FileProvider.getUriForFile(
-                                                        context,
-                                                        "${context.packageName}.fileprovider",
-                                                        file
-                                                    )
-                                                } else {
-                                                    Log.e("SummaryScreen", "HTTP ${connection.responseCode} al descargar PDF de $pdfUrlToUse")
-                                                }
-                                            } catch (e: Exception) {
-                                                Log.e("SummaryScreen", "Excepción descargando PDF: ${e.message}", e)
-                                            }
-                                        }
+                                        val contentUri = downloadDocumentPdf(
+                                            context = context,
+                                            type = type,
+                                            id = quotation.id,
+                                            refCode = refCode,
+                                            elecDocPdfUrl = elecDoc?.pdfUrl,
+                                            serverConfig = summaryViewModel.serverConfig,
+                                            token = summaryViewModel.getAuthToken()
+                                        )
 
                                         if (contentUri != null) {
                                             // Enviar con archivo PDF adjunto a WhatsApp
@@ -370,8 +339,9 @@ fun SummaryScreen(
                                                 context.startActivity(chooser)
                                             }
                                         } else {
-                                            // Fallback con mensaje de texto estructurado en WhatsApp
-                                            val fullMsg = "$message\n\nVer PDF: $pdfUrlToUse"
+                                            // Fallback con URL en texto si no fue posible generar el archivo
+                                            val fallbackUrl = "${summaryViewModel.serverConfig.getBaseUrl()}sales/${quotation.id}/sunat-pdf"
+                                            val fullMsg = "$message\n\nVer Documento: $fallbackUrl"
                                             val encodedMsg = URLEncoder.encode(fullMsg, "UTF-8")
                                             val intent = Intent(
                                                 Intent.ACTION_VIEW,
@@ -436,6 +406,118 @@ fun SummaryScreen(
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(text = state.error ?: "Error desconocido")
+        }
+    }
+}
+
+/**
+ * Función auxiliar para obtener y descargar el PDF físico del documento (Venta, SUNAT o Cotización).
+ */
+private suspend fun downloadDocumentPdf(
+    context: Context,
+    type: String,
+    id: Int,
+    refCode: String,
+    elecDocPdfUrl: String?,
+    serverConfig: ServerConfig,
+    token: String?
+): Uri? {
+    return withContext(Dispatchers.IO) {
+        try {
+            var downloadUrl: String? = null
+
+            // 1. Si viene la URL del PDF del comprobante electrónico
+            if (!elecDocPdfUrl.isNullOrBlank()) {
+                downloadUrl = serverConfig.getFullImageUrl(elecDocPdfUrl)
+            } else if (type == "sale") {
+                // 2. Probar si el endpoint de la venta devuelve la URL del PDF generado
+                val apiUrl = "${serverConfig.getBaseUrl()}sale-pdf-download/$id"
+                try {
+                    val url = URL(apiUrl)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    if (!token.isNullOrEmpty()) conn.setRequestProperty("Authorization", "Bearer $token")
+                    conn.connect()
+
+                    if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                        val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
+                        val jsonObj = JSONObject(jsonText)
+                        val dataObj = jsonObj.optJSONObject("data")
+                        val pdfUrlFromData = dataObj?.optString("sale_pdf_url")
+                        if (!pdfUrlFromData.isNullOrBlank()) {
+                            downloadUrl = serverConfig.getFullImageUrl(pdfUrlFromData)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("SummaryScreen", "Excepción llamando sale-pdf-download: ${e.message}")
+                }
+
+                // Fallback a sunat-pdf si la respuesta anterior no tuvo PDF
+                if (downloadUrl.isNullOrBlank()) {
+                    downloadUrl = "${serverConfig.getBaseUrl()}sales/$id/sunat-pdf"
+                }
+            } else {
+                // Cotizaciones
+                val apiUrl = "${serverConfig.getBaseUrl()}quotation-pdf-download/$id"
+                try {
+                    val url = URL(apiUrl)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    if (!token.isNullOrEmpty()) conn.setRequestProperty("Authorization", "Bearer $token")
+                    conn.connect()
+
+                    if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                        val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
+                        val jsonObj = JSONObject(jsonText)
+                        val dataObj = jsonObj.optJSONObject("data")
+                        val pdfUrlFromData = dataObj?.optString("quotation_pdf_url")
+                        if (!pdfUrlFromData.isNullOrBlank()) {
+                            downloadUrl = serverConfig.getFullImageUrl(pdfUrlFromData)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("SummaryScreen", "Excepción llamando quotation-pdf-download: ${e.message}")
+                }
+            }
+
+            if (downloadUrl.isNullOrBlank()) {
+                Log.e("SummaryScreen", "No se encontró ninguna URL válida para descargar el PDF")
+                return@withContext null
+            }
+
+            Log.d("SummaryScreen", "Descargando PDF desde: $downloadUrl")
+
+            // Descargar los bytes del archivo PDF
+            val pdfConn = URL(downloadUrl).openConnection() as HttpURLConnection
+            pdfConn.connectTimeout = 10000
+            pdfConn.readTimeout = 10000
+            if (!token.isNullOrEmpty()) pdfConn.setRequestProperty("Authorization", "Bearer $token")
+            pdfConn.connect()
+
+            if (pdfConn.responseCode == HttpURLConnection.HTTP_OK) {
+                val fileName = if (type == "sale") "Documento_${refCode}.pdf" else "Cotizacion_${refCode}.pdf"
+                val file = File(context.cacheDir, fileName)
+                file.outputStream().use { output ->
+                    pdfConn.inputStream.use { input ->
+                        input.copyTo(output)
+                    }
+                }
+                Log.d("SummaryScreen", "PDF descargado exitosamente: ${file.absolutePath} (${file.length()} bytes)")
+
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+            } else {
+                Log.e("SummaryScreen", "HTTP ${pdfConn.responseCode} al descargar PDF desde $downloadUrl")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("SummaryScreen", "Error descargando PDF: ${e.message}", e)
+            null
         }
     }
 }
