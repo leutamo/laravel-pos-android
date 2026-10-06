@@ -321,17 +321,19 @@ fun SummaryScreen(
                                         )
 
                                         if (contentUri != null) {
-                                            // Enviar con archivo PDF adjunto a WhatsApp
+                                            // Enviar con archivo PDF adjunto a WhatsApp y mensaje/caption
                                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                this@apply.type = "application/pdf"
                                                 putExtra(Intent.EXTRA_STREAM, contentUri)
                                                 putExtra(Intent.EXTRA_TEXT, message)
+                                                putExtra("caption", message)
                                                 putExtra("jid", "$cleanPhone@s.whatsapp.net")
+                                                clipData = android.content.ClipData.newRawUri("Documento PDF", contentUri)
                                                 if (!whatsappPkg.isNullOrEmpty()) {
                                                     setPackage(whatsappPkg)
                                                 }
                                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                             }
-                                            shareIntent.type = "application/pdf"
                                             try {
                                                 context.startActivity(shareIntent)
                                             } catch (e: Exception) {
