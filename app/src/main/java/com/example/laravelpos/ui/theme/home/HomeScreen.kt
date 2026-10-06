@@ -405,7 +405,7 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredProducts) { product ->
+                    items(filteredProducts, key = { it.id }) { product ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
