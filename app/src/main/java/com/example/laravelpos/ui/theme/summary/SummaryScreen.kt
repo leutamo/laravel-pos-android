@@ -114,7 +114,11 @@ fun SummaryScreen(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            val titleText = if (type == "sale") "Venta" else "Cotización"
+                            val titleText = if (type == "sale") {
+                                if (attr.electronicDocument != null) "Venta" else "Nota de Venta"
+                            } else {
+                                "Cotización"
+                            }
                             Text(
                                 text = "$titleText #${attr.referenceCode}",
                                 color = Color.White,
@@ -275,19 +279,27 @@ fun SummaryScreen(
 
                                 val refCode = attr.referenceCode
                                 val grandTotal = String.format("%.2f", attr.grandTotal)
-                                val fullNum = attr.electronicDocument?.fullNumber
-                                val docInfo = if (!fullNum.isNullOrEmpty()) " ($fullNum)" else ""
-                                
-                                // Determinar la URL del PDF (usar la de attr o la pública por defecto)
-                                val rawPdfUrl = attr.electronicDocument?.pdfUrl
-                                val pdfUrlToUse = if (!rawPdfUrl.isNullOrBlank()) {
-                                    summaryViewModel.serverConfig.getFullImageUrl(rawPdfUrl)
+                                val elecDoc = attr.electronicDocument
+
+                                // Construcción del mensaje adaptado al tipo de documento
+                                val message = if (elecDoc != null) {
+                                    val fullNum = elecDoc.fullNumber ?: ""
+                                    "Hola, le enviamos su Comprobante de Venta $fullNum (#$refCode) por S/ $grandTotal. ¡Gracias por su preferencia!"
+                                } else if (type == "sale") {
+                                    "Hola, le enviamos su Nota de Venta #$refCode por S/ $grandTotal. ¡Gracias por su preferencia!"
                                 } else {
-                                    val baseUrl = summaryViewModel.serverConfig.getBaseUrl()
-                                    "${baseUrl}sales/${quotation.id}/sunat-pdf"
+                                    "Hola, le enviamos su Cotización #$refCode por S/ $grandTotal. ¡Gracias por su preferencia!"
                                 }
 
-                                val message = "Hola, le enviamos su comprobante de venta$docInfo (#$refCode) por un total de S/ $grandTotal. ¡Gracias por su preferencia!"
+                                // Determinación de la URL del PDF a descargar
+                                val baseUrl = summaryViewModel.serverConfig.getBaseUrl()
+                                val pdfUrlToUse = if (elecDoc != null && !elecDoc.pdfUrl.isNullOrBlank()) {
+                                    summaryViewModel.serverConfig.getFullImageUrl(elecDoc.pdfUrl)
+                                } else if (type == "sale") {
+                                    "${baseUrl}sales/${quotation.id}/sunat-pdf"
+                                } else {
+                                    "${baseUrl}quotations/${quotation.id}"
+                                }
 
                                 // Detectar WhatsApp o WhatsApp Business instalado
                                 val whatsappPkg = try {
@@ -311,8 +323,8 @@ fun SummaryScreen(
                                             try {
                                                 val url = URL(pdfUrlToUse)
                                                 val connection = url.openConnection() as HttpURLConnection
-                                                connection.connectTimeout = 10000
-                                                connection.readTimeout = 10000
+                                                connection.connectTimeout = 8000
+                                                connection.readTimeout = 8000
                                                 val token = summaryViewModel.getAuthToken()
                                                 if (!token.isNullOrEmpty()) {
                                                     connection.setRequestProperty("Authorization", "Bearer $token")
@@ -320,7 +332,7 @@ fun SummaryScreen(
                                                 connection.connect()
 
                                                 if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                                                    val file = File(context.cacheDir, "Comprobante_${refCode}.pdf")
+                                                    val file = File(context.cacheDir, "Documento_${refCode}.pdf")
                                                     file.outputStream().use { output ->
                                                         connection.inputStream.use { input ->
                                                             input.copyTo(output)
@@ -332,7 +344,7 @@ fun SummaryScreen(
                                                         file
                                                     )
                                                 } else {
-                                                    Log.e("SummaryScreen", "Error descargando PDF HTTP: ${connection.responseCode}")
+                                                    Log.e("SummaryScreen", "HTTP ${connection.responseCode} al descargar PDF de $pdfUrlToUse")
                                                 }
                                             } catch (e: Exception) {
                                                 Log.e("SummaryScreen", "Excepción descargando PDF: ${e.message}", e)
@@ -354,11 +366,11 @@ fun SummaryScreen(
                                             try {
                                                 context.startActivity(shareIntent)
                                             } catch (e: Exception) {
-                                                val chooser = Intent.createChooser(shareIntent, "Enviar comprobante por WhatsApp")
+                                                val chooser = Intent.createChooser(shareIntent, "Enviar documento por WhatsApp")
                                                 context.startActivity(chooser)
                                             }
                                         } else {
-                                            // Fallback con URL en texto si no se pudo descargar el archivo
+                                            // Fallback con mensaje de texto estructurado en WhatsApp
                                             val fullMsg = "$message\n\nVer PDF: $pdfUrlToUse"
                                             val encodedMsg = URLEncoder.encode(fullMsg, "UTF-8")
                                             val intent = Intent(
