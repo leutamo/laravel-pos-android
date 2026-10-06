@@ -1,7 +1,9 @@
 package com.example.laravelpos.viewmodel
 
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.laravelpos.data.config.ServerConfig
 import com.example.laravelpos.data.model.QuotationData
 import com.example.laravelpos.data.repository.QuotationRepository
 import com.example.laravelpos.data.repository.SaleRepository
@@ -21,11 +23,17 @@ data class SummaryState(
 @HiltViewModel
 class SummaryViewModel @Inject constructor(
     private val quotationRepository: QuotationRepository,
-    private val saleRepository: SaleRepository
+    private val saleRepository: SaleRepository,
+    val serverConfig: ServerConfig,
+    private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SummaryState())
     val state: StateFlow<SummaryState> = _state.asStateFlow()
+
+    fun getAuthToken(): String? {
+        return sharedPreferences.getString("auth_token", null)
+    }
 
     fun loadData(type: String, id: Int) {
         viewModelScope.launch {

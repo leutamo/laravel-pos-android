@@ -277,49 +277,77 @@ fun SummaryScreen(
                                 val grandTotal = String.format("%.2f", attr.grandTotal)
                                 val fullNum = attr.electronicDocument?.fullNumber
                                 val docInfo = if (!fullNum.isNullOrEmpty()) " ($fullNum)" else ""
-                                val rawPdfUrl = attr.electronicDocument?.pdfUrl ?: ""
+                                
+                                // Determinar la URL del PDF (usar la de attr o la pública por defecto)
+                                val rawPdfUrl = attr.electronicDocument?.pdfUrl
+                                val pdfUrlToUse = if (!rawPdfUrl.isNullOrBlank()) {
+                                    summaryViewModel.serverConfig.getFullImageUrl(rawPdfUrl)
+                                } else {
+                                    val baseUrl = summaryViewModel.serverConfig.getBaseUrl()
+                                    "${baseUrl}sales/${quotation.id}/sunat-pdf"
+                                }
 
                                 val message = "Hola, le enviamos su comprobante de venta$docInfo (#$refCode) por un total de S/ $grandTotal. ¡Gracias por su preferencia!"
+
+                                // Detectar WhatsApp o WhatsApp Business instalado
+                                val whatsappPkg = try {
+                                    context.packageManager.getPackageInfo("com.whatsapp", 0)
+                                    "com.whatsapp"
+                                } catch (e: Exception) {
+                                    try {
+                                        context.packageManager.getPackageInfo("com.whatsapp.w4b", 0)
+                                        "com.whatsapp.w4b"
+                                    } catch (e2: Exception) {
+                                        null
+                                    }
+                                }
 
                                 scope.launch {
                                     isSendingWhatsapp = true
                                     try {
                                         var contentUri: Uri? = null
 
-                                        if (!rawPdfUrl.isNullOrEmpty()) {
-                                            withContext(Dispatchers.IO) {
-                                                try {
-                                                    val url = URL(rawPdfUrl)
-                                                    val connection = url.openConnection() as HttpURLConnection
-                                                    connection.connectTimeout = 8000
-                                                    connection.readTimeout = 8000
-                                                    connection.connect()
-
-                                                    if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                                                        val file = File(context.cacheDir, "Comprobante_${refCode}.pdf")
-                                                        file.outputStream().use { output ->
-                                                            connection.inputStream.use { input ->
-                                                                input.copyTo(output)
-                                                            }
-                                                        }
-                                                        contentUri = FileProvider.getUriForFile(
-                                                            context,
-                                                            "${context.packageName}.fileprovider",
-                                                            file
-                                                        )
-                                                    }
-                                                } catch (e: Exception) {
-                                                    Log.e("SummaryScreen", "Error descargando PDF: ${e.message}")
+                                        withContext(Dispatchers.IO) {
+                                            try {
+                                                val url = URL(pdfUrlToUse)
+                                                val connection = url.openConnection() as HttpURLConnection
+                                                connection.connectTimeout = 10000
+                                                connection.readTimeout = 10000
+                                                val token = summaryViewModel.getAuthToken()
+                                                if (!token.isNullOrEmpty()) {
+                                                    connection.setRequestProperty("Authorization", "Bearer $token")
                                                 }
+                                                connection.connect()
+
+                                                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                                                    val file = File(context.cacheDir, "Comprobante_${refCode}.pdf")
+                                                    file.outputStream().use { output ->
+                                                        connection.inputStream.use { input ->
+                                                            input.copyTo(output)
+                                                        }
+                                                    }
+                                                    contentUri = FileProvider.getUriForFile(
+                                                        context,
+                                                        "${context.packageName}.fileprovider",
+                                                        file
+                                                    )
+                                                } else {
+                                                    Log.e("SummaryScreen", "Error descargando PDF HTTP: ${connection.responseCode}")
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e("SummaryScreen", "Excepción descargando PDF: ${e.message}", e)
                                             }
                                         }
 
                                         if (contentUri != null) {
-                                            // Enviar con archivo PDF adjunto
+                                            // Enviar con archivo PDF adjunto a WhatsApp
                                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                                 putExtra(Intent.EXTRA_STREAM, contentUri)
                                                 putExtra(Intent.EXTRA_TEXT, message)
                                                 putExtra("jid", "$cleanPhone@s.whatsapp.net")
+                                                if (!whatsappPkg.isNullOrEmpty()) {
+                                                    setPackage(whatsappPkg)
+                                                }
                                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                             }
                                             shareIntent.type = "application/pdf"
@@ -330,13 +358,16 @@ fun SummaryScreen(
                                                 context.startActivity(chooser)
                                             }
                                         } else {
-                                            // Fallback con URL en texto
-                                            val fullMsg = if (!rawPdfUrl.isNullOrEmpty()) "$message\n\nVer PDF: $rawPdfUrl" else message
+                                            // Fallback con URL en texto si no se pudo descargar el archivo
+                                            val fullMsg = "$message\n\nVer PDF: $pdfUrlToUse"
                                             val encodedMsg = URLEncoder.encode(fullMsg, "UTF-8")
                                             val intent = Intent(
                                                 Intent.ACTION_VIEW,
                                                 Uri.parse("https://api.whatsapp.com/send?phone=$cleanPhone&text=$encodedMsg")
                                             )
+                                            if (!whatsappPkg.isNullOrEmpty()) {
+                                                intent.setPackage(whatsappPkg)
+                                            }
                                             context.startActivity(intent)
                                         }
                                     } catch (e: Exception) {
