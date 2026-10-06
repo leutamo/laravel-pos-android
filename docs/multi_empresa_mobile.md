@@ -1,8 +1,8 @@
-# Documentación del Flujo Multi-Empresa para App Android (Laravel POS)
+# Documentación del Flujo Multi-Empresa y Envío de PDF por WhatsApp (Laravel POS Android)
 
 ## 1. Visión General
 
-Se ha integrado el soporte para **Multi-Empresa de Facturación Electrónica** en la aplicación móvil Android. Esta funcionalidad permite que los cajeros o usuarios del POS puedan seleccionar con cuál empresa emisora desean facturar sus ventas (Boletas / Facturas / Notas de Venta).
+Se ha integrado el soporte para **Multi-Empresa de Facturación Electrónica** y la funcionalidad de **Envío de Comprobantes PDF por WhatsApp** en la aplicación móvil Android. Esta solución permite que los cajeros o usuarios del POS puedan seleccionar con cuál empresa emisora desean facturar sus ventas (Boletas / Facturas / Notas de Venta) y enviar el archivo PDF físico correspondiente a sus clientes.
 
 ---
 
@@ -111,6 +111,8 @@ La app móvil se comunica con el backend mediante los siguientes endpoints auten
   - `UserAttributes` actualizado con `default_company_id` y `default_company`.
 - `Sale.kt`:
   - `SaleRequest` actualizado agregando la propiedad opcional `@SerialName("company_id") val companyId: Int? = null`.
+- `Quotation.kt`:
+  - `QuotationAttributes` actualizado agregando `customerPhone` y `electronicDocument` (`ElectronicDocumentData`).
 
 ### Repositorio (`data/repository/`)
 - `BillingCompanyRepository.kt`:
@@ -124,6 +126,7 @@ La app móvil se comunica con el backend mediante los siguientes endpoints auten
 - `LoginViewModel.kt`:
   - Expone los flujos de estado `billingCompanies`, `activeCompany`, `isLoadingCompanies` y `companyError`.
   - Métodos `loadBillingCompanies()` y `selectActiveCompany(company)`.
+  - Observador en tiempo real de `SharedPreferences` para cerrar sesión automáticamente ante respuestas HTTP 401 Unauthenticated.
 - `CheckoutViewModel.kt`:
   - Accede a `BillingCompanyRepository` para recuperar el `company_id` activo.
   - Al procesar la venta (`processCheckout`), adjunta `companyId` al `SaleRequest`.
@@ -133,28 +136,57 @@ La app móvil se comunica con el backend mediante los siguientes endpoints auten
 - `HomeScreen.kt` (Menú Hamburguesa / Navigation Drawer):
   - Agregado en el `ModalDrawerSheet` la sección **Empresa Emisora**.
   - Permite visualizar la empresa seleccionada con su RUC y desplegar un `DropdownMenu` con las empresas disponibles para cambiar la selección.
+  - Agregado el indicador visual de carga cuando abre la app.
 - `CheckoutScreen.kt` (Pantalla de Cobro):
   - Muestra una tarjeta informativa indicando la **Empresa Emisora** que emitirá el comprobante antes de presionar "Procesar Venta".
+- `SummaryScreen.kt` (Resumen de Venta / Cotización):
+  - Muestra el campo de texto para **Número de WhatsApp / Teléfono** con auto-completado del teléfono registrado del cliente.
+  - Botón verde con estilo e icono de **WhatsApp** para procesar y adjuntar la descarga del PDF oficial.
 
 ---
 
-## 4. Flujo de Funcionamiento Paso a Paso
+## 4. Lógica de Descarga y Envío de PDF por WhatsApp (SUNAT vs. Normal)
 
-1. **Inicio de Sesión / Carga Inicial:**
-   - El usuario inicia sesión. Al obtener el perfil, el sistema carga y guarda la empresa por defecto del usuario.
-   - La app consulta `GET /api/m1/billing-companies` para obtener la lista actualizada de empresas emisoras disponibles.
+Se ha implementado un flujo inteligente en `SummaryScreen.kt` (`downloadDocumentPdf`) para enviar el archivo PDF físico correspondiente como documento adjunto a través de WhatsApp (`com.whatsapp` / `com.whatsapp.w4b`).
 
-2. **Visualización y Cambio desde el Menú Hamburguesa:**
-   - El usuario abre el menú lateral (hamburguesa).
-   - En la sección **Empresa Emisora**, ve la empresa seleccionada actualmente (Nombre y RUC).
-   - Al tocar el selector, se abre un menú desplegable con todas las empresas emisoras activas.
-   - Al seleccionar una empresa alternativa:
-     - La app llama a `POST /api/m1/user-active-company` con `company_id`.
-     - El backend actualiza `users.default_company_id`.
-     - La app actualiza la empresa activa localmente.
+### A. Diferenciación de Tipos de Documentos y Resolutores de PDF
 
-3. **Cobro y Emisión de Comprobantes:**
-   - El usuario agrega productos al carrito y navega a la pantalla de Cobro / Checkout.
-   - En el Checkout se visualiza la tarjeta con la **Empresa Emisora** activa.
-   - Al procesar la venta, se envía el campo `"company_id": ID_SELECCIONADO` al backend.
-   - El backend emite la Boleta/Factura en SUNAT usando las credenciales, series y correlativos pertenecientes a dicha empresa.
+1. **Comprobantes Electrónicos SUNAT (Boleta / Factura - `voucher_type: "01"` / `"03"`)**:
+   - **Texto del Mensaje:** `"Hola, le enviamos su Comprobante de Venta B001-XXXX (#SA_XXXX) por S/ XX.XX. ¡Gracias por su preferencia!"`
+   - **Obtención del PDF:**
+     - Si la respuesta trae `electronic_document.pdf_url`, se descarga desde esa ruta.
+     - Fallback dinámico a la ruta pública SUNAT: `GET /api/sales/{sale_id}/sunat-pdf`.
+
+2. **Notas de Venta Internas (`voucher_type: "nota_venta"` / `"00"`)**:
+   - **Texto del Mensaje:** `"Hola, le enviamos su Nota de Venta #SA_XXXX por S/ XX.XX. ¡Gracias por su preferencia!"`
+   - **Obtención del PDF:**
+     1. Invoca el endpoint interno de generación de PDF de venta: `GET /api/sale-pdf-download/{sale_id}`.
+     2. Extrae la propiedad `data.sale_pdf_url` de la respuesta JSON.
+     3. Si la respuesta trae la URL del PDF generado, lo descarga a la caché del teléfono.
+     4. Fallback dinámico a `/api/sales/{sale_id}/sunat-pdf`.
+
+3. **Cotizaciones (`type == "quotation"`)**:
+   - **Texto del Mensaje:** `"Hola, le enviamos su Cotización #QT_XXXX por S/ XX.XX. ¡Gracias por su preferencia!"`
+   - **Obtención del PDF:**
+     1. Invoca `GET /api/quotation-pdf-download/{quotation_id}`.
+     2. Extrae la propiedad `data.quotation_pdf_url` de la respuesta JSON.
+
+---
+
+### B. Proceso de Descarga y Envío Adjunto en Android
+
+1. **Descarga en Caché Local (`downloadDocumentPdf`)**:
+   - Se descargan los bytes del archivo PDF en la carpeta temporal `context.cacheDir/Documento_SA_XXXX.pdf`.
+   - Transmite las credenciales mediante la cabecera `Authorization: Bearer {token}` si la ruta requiere autenticación.
+
+2. **Proveedor Seguro de Archivos (`FileProvider`)**:
+   - Configurado en `AndroidManifest.xml` mediante `file_paths.xml` para exponer el URI seguro `content://com.example.laravelpos.fileprovider/pdf_cache/Documento_SA_XXXX.pdf`.
+
+3. **Intent de Envío a WhatsApp (`Intent.ACTION_SEND`)**:
+   - **MIME Type:** `application/pdf`
+   - **Extra Stream:** `contentUri` (Archivo PDF físico `.pdf`)
+   - **Extra Text:** Mensaje personalizado con el número de comprobante y total
+   - **Target Package:** Asigna `setPackage("com.whatsapp")` o `"com.whatsapp.w4b"`, con el parámetro de destinatario `jid = "{cleanPhone}@s.whatsapp.net"`.
+
+4. **Mecanismo de Respaldo (Fallback)**:
+   - Si por algún motivo el archivo no pudiera descargarse, se activa la apertura mediante la URL web de WhatsApp API (`https://api.whatsapp.com/send?phone=...&text=...`) incluyendo el enlace de descarga del documento en el mensaje.
