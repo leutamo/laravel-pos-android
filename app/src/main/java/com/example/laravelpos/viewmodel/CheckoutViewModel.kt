@@ -297,11 +297,20 @@ class CheckoutViewModel @Inject constructor(
                     val activeCompanyId = billingCompanyRepository.getSavedActiveCompanyId()
                     val companyId = if (activeCompanyId > 0) activeCompanyId else null
 
+                    val mappedVoucherType = when (selectedReceiptType?.lowercase()?.trim()) {
+                        "nota de venta", "nota_venta", "nota", "ticket" -> "nota_venta"
+                        "boleta de venta", "boleta", "03" -> "03"
+                        "factura", "01" -> "01"
+                        else -> "nota_venta"
+                    }
+                    
+
                     val request = SaleRequest(
                         date = currentDate,
                         customerId = customerId,
                         warehouseId = 1,
                         companyId = companyId,
+                        voucherType = mappedVoucherType,
                         taxRate = "0.00",
                         taxAmount = String.format(Locale.US, "%.2f", calculatedTotalTax),
                         discount = "0.00",

@@ -25,6 +25,7 @@ data class SaleRequest(
     @SerialName("customer_id") val customerId: Int,
     @SerialName("warehouse_id") val warehouseId: Int,
     @SerialName("company_id") val companyId: Int? = null,
+    @SerialName("voucher_type") val voucherType: String? = null,
     @SerialName("tax_rate") val taxRate: String,
     @SerialName("tax_amount") val taxAmount: String,
     @SerialName("discount") val discount: String,
