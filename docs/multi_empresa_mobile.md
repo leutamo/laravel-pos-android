@@ -33,6 +33,7 @@ La app móvil se comunica con el backend mediante los siguientes endpoints auten
   "customer_id": 1,
   "warehouse_id": 1,
   "company_id": 2,
+  "voucher_type": "nota_venta",
   "tax_rate": "0.00",
   "tax_amount": "1.80",
   "grand_total": "11.80",
