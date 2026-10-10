@@ -109,6 +109,8 @@ fun SummaryScreen(
         }
     } else if (quotation != null) {
         val attr = quotation.attributes
+        val isElecDoc = attr.electronicDocument != null
+
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -118,7 +120,7 @@ fun SummaryScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             val titleText = if (type == "sale") {
-                                if (attr.electronicDocument != null) "Venta" else "Nota de Venta"
+                                if (isElecDoc) "Venta" else "Nota de Venta"
                             } else {
                                 "Cotización"
                             }
@@ -284,7 +286,7 @@ fun SummaryScreen(
                                 val grandTotal = String.format("%.2f", attr.grandTotal)
                                 val elecDoc = attr.electronicDocument
 
-                                // Construcción del mensaje
+                                // Construcción del mensaje adaptado al tipo de comprobante
                                 val message = if (elecDoc != null) {
                                     val fullNum = elecDoc.fullNumber ?: ""
                                     "Hola, le enviamos su Comprobante de Venta $fullNum (#$refCode) por S/ $grandTotal. ¡Gracias por su preferencia!"
@@ -315,6 +317,7 @@ fun SummaryScreen(
                                             type = type,
                                             id = quotation.id,
                                             refCode = refCode,
+                                            isElectronicDocument = isElecDoc,
                                             elecDocPdfUrl = elecDoc?.pdfUrl,
                                             serverConfig = summaryViewModel.serverConfig,
                                             token = summaryViewModel.getAuthToken()
@@ -341,8 +344,12 @@ fun SummaryScreen(
                                                 context.startActivity(chooser)
                                             }
                                         } else {
-                                            // Fallback con URL en texto si no fue posible generar el archivo
-                                            val fallbackUrl = "${summaryViewModel.serverConfig.getBaseUrl()}sales/${quotation.id}/sunat-pdf"
+                                            // Fallback con URL en texto
+                                            val fallbackUrl = if (isElecDoc) {
+                                                "${summaryViewModel.serverConfig.getBaseUrl()}sales/${quotation.id}/sunat-pdf"
+                                            } else {
+                                                "${summaryViewModel.serverConfig.getBaseUrl()}sale-pdf-download/${quotation.id}"
+                                            }
                                             val fullMsg = "$message\n\nVer Documento: $fallbackUrl"
                                             val encodedMsg = URLEncoder.encode(fullMsg, "UTF-8")
                                             val intent = Intent(
@@ -413,13 +420,14 @@ fun SummaryScreen(
 }
 
 /**
- * Función auxiliar para obtener y descargar el PDF físico del documento (Venta, SUNAT o Cotización).
+ * Función auxiliar para obtener y descargar el PDF físico del documento (Venta SUNAT, Nota de Venta o Cotización).
  */
 private suspend fun downloadDocumentPdf(
     context: Context,
     type: String,
     id: Int,
     refCode: String,
+    isElectronicDocument: Boolean,
     elecDocPdfUrl: String?,
     serverConfig: ServerConfig,
     token: String?
@@ -428,11 +436,11 @@ private suspend fun downloadDocumentPdf(
         try {
             var downloadUrl: String? = null
 
-            // 1. Si viene la URL del PDF del comprobante electrónico
-            if (!elecDocPdfUrl.isNullOrBlank()) {
-                downloadUrl = serverConfig.getFullImageUrl(elecDocPdfUrl)
+            if (isElectronicDocument) {
+                // 1. Es Boleta o Factura Electrónica SUNAT -> Obtener siempre el PDF A4 oficial de SUNAT
+                downloadUrl = "${serverConfig.getBaseUrl()}sales/$id/sunat-pdf"
             } else if (type == "sale") {
-                // 2. Probar si el endpoint de la venta devuelve la URL del PDF generado
+                // 2. Es Nota de Venta (sin comprobante SUNAT) -> Obtener el PDF interno de la nota de venta desde la API
                 val apiUrl = "${serverConfig.getBaseUrl()}sale-pdf-download/$id"
                 try {
                     val url = URL(apiUrl)
@@ -452,15 +460,14 @@ private suspend fun downloadDocumentPdf(
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e("SummaryScreen", "Excepción llamando sale-pdf-download: ${e.message}")
+                    Log.e("SummaryScreen", "Error llamando sale-pdf-download: ${e.message}")
                 }
 
-                // Fallback a sunat-pdf si la respuesta anterior no tuvo PDF
-                if (downloadUrl.isNullOrBlank()) {
-                    downloadUrl = "${serverConfig.getBaseUrl()}sales/$id/sunat-pdf"
+                if (downloadUrl.isNullOrBlank() && !elecDocPdfUrl.isNullOrBlank()) {
+                    downloadUrl = serverConfig.getFullImageUrl(elecDocPdfUrl)
                 }
             } else {
-                // Cotizaciones
+                // 3. Es Cotización
                 val apiUrl = "${serverConfig.getBaseUrl()}quotation-pdf-download/$id"
                 try {
                     val url = URL(apiUrl)
@@ -480,7 +487,7 @@ private suspend fun downloadDocumentPdf(
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e("SummaryScreen", "Excepción llamando quotation-pdf-download: ${e.message}")
+                    Log.e("SummaryScreen", "Error llamando quotation-pdf-download: ${e.message}")
                 }
             }
 
@@ -489,7 +496,7 @@ private suspend fun downloadDocumentPdf(
                 return@withContext null
             }
 
-            Log.d("SummaryScreen", "Descargando PDF desde: $downloadUrl")
+            Log.d("SummaryScreen", "Descargando PDF oficial desde: $downloadUrl")
 
             // Descargar los bytes del archivo PDF
             val pdfConn = URL(downloadUrl).openConnection() as HttpURLConnection
@@ -499,14 +506,20 @@ private suspend fun downloadDocumentPdf(
             pdfConn.connect()
 
             if (pdfConn.responseCode == HttpURLConnection.HTTP_OK) {
-                val fileName = if (type == "sale") "Documento_${refCode}.pdf" else "Cotizacion_${refCode}.pdf"
+                val fileName = if (isElectronicDocument) {
+                    "Comprobante_SUNAT_${refCode}.pdf"
+                } else if (type == "sale") {
+                    "Nota_de_Venta_${refCode}.pdf"
+                } else {
+                    "Cotizacion_${refCode}.pdf"
+                }
                 val file = File(context.cacheDir, fileName)
                 file.outputStream().use { output ->
                     pdfConn.inputStream.use { input ->
                         input.copyTo(output)
                     }
                 }
-                Log.d("SummaryScreen", "PDF descargado exitosamente: ${file.absolutePath} (${file.length()} bytes)")
+                Log.d("SummaryScreen", "PDF guardado exitosamente: ${file.absolutePath} (${file.length()} bytes)")
 
                 FileProvider.getUriForFile(
                     context,
