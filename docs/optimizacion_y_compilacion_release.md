@@ -68,9 +68,31 @@ Se configuraron las reglas necesarias en `app/proguard-rules.pro` para permitir 
 
 ---
 
-## 4. Guía para Generar el APK de Producción (Release)
+## 4. Configuración de Firma Digital para Instalación (Signing Config)
 
-### Opción A: Mediante la Terminal de Comandos
+Por defecto en Android, si un APK de tipo `release` no tiene una firma digital configurada, el instalador de Android bloquea la instalación mostrando el mensaje: **"No se instaló la aplicación"**.
+
+Para solucionar esto y permitir la instalación directa de la versión optimizada en dispositivos de prueba o clientes, se configuró en `app/build.gradle.kts` la sección `signingConfigs`:
+
+```kotlin
+signingConfigs {
+    create("release") {
+        val debugKeystore = file("${System.getProperty("user.home")}/.android/debug.keystore")
+        if (debugKeystore.exists()) {
+            storeFile = debugKeystore
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+}
+```
+
+---
+
+## 5. Guía para Generar el APK de Producción (Release)
+
+### Opción A: Mediante la Terminal de Comandos (Recomendada)
 
 Abre la terminal en la raíz del proyecto Android y ejecuta:
 
@@ -78,7 +100,7 @@ Abre la terminal en la raíz del proyecto Android y ejecuta:
 ./gradlew assembleRelease
 ```
 
-Al finalizar la compilación exitosa (`BUILD SUCCESSFUL`), la ubicación del APK optimizado listo para instalar o distribuir es:
+Al finalizar la compilación exitosa (`BUILD SUCCESSFUL`), la ubicación del APK firmado y optimizado listo para instalar directamente en cualquier teléfono es:
 
 ```
 app/build/outputs/apk/release/app-release.apk
@@ -90,6 +112,7 @@ app/build/outputs/apk/release/app-release.apk
 
 1. Ve al menú superior: **Build -> Generate Signed Bundle / APK...**
 2. Selecciona **APK** y presiona **Next**.
-3. Selecciona tu clave/keystore de firma.
+3. Selecciona tu clave/keystore de firma de producción (`.jks` / `.keystore`).
 4. En **Build Variants**, selecciona **`release`**.
 5. Presiona **Create / Finish**.
+
