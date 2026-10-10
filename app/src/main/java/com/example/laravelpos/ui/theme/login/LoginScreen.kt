@@ -1,13 +1,17 @@
 package com.example.laravelpos.ui.theme.login
 
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -16,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
@@ -68,23 +73,17 @@ fun LoginScreen(navController: NavController) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Estado para la animación de la imagen
-                var targetOffset by remember { mutableStateOf(0.dp) }
-                val animatedOffset: Dp by animateDpAsState(
-                    targetValue = targetOffset,
-                    animationSpec = tween(durationMillis = 1500),
-                    label = "offsetAnimation"
+                // Animación eficiente en GPU (RenderThread) que no genera recomposición continua
+                val infiniteTransition = rememberInfiniteTransition(label = "logoBounce")
+                val translateY by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 20f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1500, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "translateY"
                 )
-
-                // Este efecto se lanza una vez y luego se repite para la animación
-                LaunchedEffect(Unit) {
-                    while (true) {
-                        targetOffset = 15.dp
-                        kotlinx.coroutines.delay(1500)
-                        targetOffset = 0.dp
-                        kotlinx.coroutines.delay(1500)
-                    }
-                }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -93,7 +92,7 @@ fun LoginScreen(navController: NavController) {
                     contentDescription = "POS system image",
                     modifier = Modifier
                         .size(150.dp)
-                        .offset(y = animatedOffset) // Aplicamos la animación
+                        .graphicsLayer { translationY = translateY }
                         .padding(bottom = 32.dp)
                 )
 

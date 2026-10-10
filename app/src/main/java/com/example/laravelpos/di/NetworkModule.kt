@@ -14,6 +14,7 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
+import com.example.laravelpos.BuildConfig
 import com.example.laravelpos.data.config.ServerConfig
 import kotlinx.serialization.json.Json
 import javax.inject.Singleton
@@ -38,7 +39,7 @@ object NetworkModule {
             }
             install(Logging) {
                 logger = Logger.DEFAULT
-                level = LogLevel.ALL
+                level = if (BuildConfig.DEBUG) LogLevel.INFO else LogLevel.NONE
             }
             install(HttpTimeout) {
                 requestTimeoutMillis = 15000
