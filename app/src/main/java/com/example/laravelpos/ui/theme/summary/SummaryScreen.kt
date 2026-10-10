@@ -421,6 +421,7 @@ fun SummaryScreen(
 
 /**
  * Función auxiliar para obtener y descargar el PDF físico del documento (Venta SUNAT, Nota de Venta o Cotización).
+ * Incluye validación de cabecera binaria (%PDF) para prevenir adjuntar HTMLs o JSONs corruptos.
  */
 private suspend fun downloadDocumentPdf(
     context: Context,
@@ -433,106 +434,132 @@ private suspend fun downloadDocumentPdf(
     token: String?
 ): Uri? {
     return withContext(Dispatchers.IO) {
-        try {
-            var downloadUrl: String? = null
+        val fileName = if (isElectronicDocument) {
+            "Comprobante_SUNAT_${refCode}.pdf"
+        } else if (type == "sale") {
+            "Nota_de_Venta_${refCode}.pdf"
+        } else {
+            "Cotizacion_${refCode}.pdf"
+        }
 
-            if (isElectronicDocument) {
-                // 1. Es Boleta o Factura Electrónica SUNAT -> Obtener siempre el PDF A4 oficial de SUNAT
-                downloadUrl = "${serverConfig.getBaseUrl()}sales/$id/sunat-pdf"
-            } else if (type == "sale") {
-                // 2. Es Nota de Venta (sin comprobante SUNAT) -> Obtener el PDF interno de la nota de venta desde la API
-                val apiUrl = "${serverConfig.getBaseUrl()}sale-pdf-download/$id"
-                try {
-                    val url = URL(apiUrl)
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.connectTimeout = 8000
-                    conn.readTimeout = 8000
-                    if (!token.isNullOrEmpty()) conn.setRequestProperty("Authorization", "Bearer $token")
-                    conn.connect()
+        // Lista de candidatos a descargar ordenados por prioridad
+        val urlsToTry = mutableListOf<String>()
 
-                    if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                        val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
-                        val jsonObj = JSONObject(jsonText)
-                        val dataObj = jsonObj.optJSONObject("data")
-                        val pdfUrlFromData = dataObj?.optString("sale_pdf_url")
-                        if (!pdfUrlFromData.isNullOrBlank()) {
-                            downloadUrl = serverConfig.getFullImageUrl(pdfUrlFromData)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("SummaryScreen", "Error llamando sale-pdf-download: ${e.message}")
-                }
-
-                if (downloadUrl.isNullOrBlank() && !elecDocPdfUrl.isNullOrBlank()) {
-                    downloadUrl = serverConfig.getFullImageUrl(elecDocPdfUrl)
-                }
-            } else {
-                // 3. Es Cotización
-                val apiUrl = "${serverConfig.getBaseUrl()}quotation-pdf-download/$id"
-                try {
-                    val url = URL(apiUrl)
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.connectTimeout = 8000
-                    conn.readTimeout = 8000
-                    if (!token.isNullOrEmpty()) conn.setRequestProperty("Authorization", "Bearer $token")
-                    conn.connect()
-
-                    if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                        val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
-                        val jsonObj = JSONObject(jsonText)
-                        val dataObj = jsonObj.optJSONObject("data")
-                        val pdfUrlFromData = dataObj?.optString("quotation_pdf_url")
-                        if (!pdfUrlFromData.isNullOrBlank()) {
-                            downloadUrl = serverConfig.getFullImageUrl(pdfUrlFromData)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("SummaryScreen", "Error llamando quotation-pdf-download: ${e.message}")
-                }
+        if (isElectronicDocument) {
+            urlsToTry.add("${serverConfig.getBaseUrl()}sales/$id/sunat-pdf")
+            if (!elecDocPdfUrl.isNullOrBlank()) {
+                urlsToTry.add(serverConfig.getFullImageUrl(elecDocPdfUrl))
             }
+        }
 
-            if (downloadUrl.isNullOrBlank()) {
-                Log.e("SummaryScreen", "No se encontró ninguna URL válida para descargar el PDF")
-                return@withContext null
-            }
+        if (type == "sale") {
+            // Intentar obtener la URL del PDF del endpoint sale-pdf-download
+            val apiUrl = "${serverConfig.getBaseUrl()}sale-pdf-download/$id"
+            try {
+                val url = URL(apiUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                if (!token.isNullOrEmpty()) conn.setRequestProperty("Authorization", "Bearer $token")
+                conn.connect()
 
-            Log.d("SummaryScreen", "Descargando PDF oficial desde: $downloadUrl")
-
-            // Descargar los bytes del archivo PDF
-            val pdfConn = URL(downloadUrl).openConnection() as HttpURLConnection
-            pdfConn.connectTimeout = 10000
-            pdfConn.readTimeout = 10000
-            if (!token.isNullOrEmpty()) pdfConn.setRequestProperty("Authorization", "Bearer $token")
-            pdfConn.connect()
-
-            if (pdfConn.responseCode == HttpURLConnection.HTTP_OK) {
-                val fileName = if (isElectronicDocument) {
-                    "Comprobante_SUNAT_${refCode}.pdf"
-                } else if (type == "sale") {
-                    "Nota_de_Venta_${refCode}.pdf"
-                } else {
-                    "Cotizacion_${refCode}.pdf"
+                if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                    val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
+                    val jsonObj = JSONObject(jsonText)
+                    val dataObj = jsonObj.optJSONObject("data")
+                    val pdfUrlFromData = dataObj?.optString("sale_pdf_url")
+                    if (!pdfUrlFromData.isNullOrBlank()) {
+                        urlsToTry.add(serverConfig.getFullImageUrl(pdfUrlFromData))
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e("SummaryScreen", "Error en sale-pdf-download: ${e.message}")
+            }
+            if (!elecDocPdfUrl.isNullOrBlank()) {
+                urlsToTry.add(serverConfig.getFullImageUrl(elecDocPdfUrl))
+            }
+            if (!isElectronicDocument) {
+                urlsToTry.add("${serverConfig.getBaseUrl()}sales/$id/sunat-pdf")
+            }
+        } else {
+            // Cotización
+            val apiUrl = "${serverConfig.getBaseUrl()}quotation-pdf-download/$id"
+            try {
+                val url = URL(apiUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                if (!token.isNullOrEmpty()) conn.setRequestProperty("Authorization", "Bearer $token")
+                conn.connect()
+
+                if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                    val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
+                    val jsonObj = JSONObject(jsonText)
+                    val dataObj = jsonObj.optJSONObject("data")
+                    val pdfUrlFromData = dataObj?.optString("quotation_pdf_url")
+                    if (!pdfUrlFromData.isNullOrBlank()) {
+                        urlsToTry.add(serverConfig.getFullImageUrl(pdfUrlFromData))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("SummaryScreen", "Error en quotation-pdf-download: ${e.message}")
+            }
+        }
+
+        // Probar secuencialmente cada URL hasta validar la cabecera %PDF
+        for (downloadUrl in urlsToTry.distinct()) {
+            Log.d("SummaryScreen", "Probrando descarga de PDF binario desde: $downloadUrl")
+            val uri = tryDownloadAndVerifyPdf(downloadUrl, token, fileName, context)
+            if (uri != null) {
+                return@withContext uri
+            }
+        }
+
+        Log.e("SummaryScreen", "Ninguna URL entregó un binario PDF válido (%PDF)")
+        null
+    }
+}
+
+private fun tryDownloadAndVerifyPdf(
+    downloadUrl: String,
+    token: String?,
+    fileName: String,
+    context: Context
+): Uri? {
+    try {
+        val pdfConn = URL(downloadUrl).openConnection() as HttpURLConnection
+        pdfConn.connectTimeout = 10000
+        pdfConn.readTimeout = 10000
+        if (!token.isNullOrEmpty()) pdfConn.setRequestProperty("Authorization", "Bearer $token")
+        pdfConn.connect()
+
+        if (pdfConn.responseCode == HttpURLConnection.HTTP_OK) {
+            val bytes = pdfConn.inputStream.use { it.readBytes() }
+
+            // Verificar si el archivo comienza exactamente con %PDF (% = 0x25, P = 0x50, D = 0x44, F = 0x46)
+            if (bytes.size > 4 &&
+                bytes[0] == '%'.code.toByte() &&
+                bytes[1] == 'P'.code.toByte() &&
+                bytes[2] == 'D'.code.toByte() &&
+                bytes[3] == 'F'.code.toByte()
+            ) {
                 val file = File(context.cacheDir, fileName)
-                file.outputStream().use { output ->
-                    pdfConn.inputStream.use { input ->
-                        input.copyTo(output)
-                    }
-                }
-                Log.d("SummaryScreen", "PDF guardado exitosamente: ${file.absolutePath} (${file.length()} bytes)")
-
-                FileProvider.getUriForFile(
+                file.writeBytes(bytes)
+                Log.d("SummaryScreen", "¡Binario PDF válido (%PDF)! Guardado en ${file.absolutePath} (${bytes.size} bytes)")
+                return FileProvider.getUriForFile(
                     context,
                     "${context.packageName}.fileprovider",
                     file
                 )
             } else {
-                Log.e("SummaryScreen", "HTTP ${pdfConn.responseCode} al descargar PDF desde $downloadUrl")
-                null
+                val previewStr = String(bytes.take(80).toByteArray())
+                Log.w("SummaryScreen", "La respuesta de $downloadUrl no es un PDF binario (vista previa: $previewStr)")
             }
-        } catch (e: Exception) {
-            Log.e("SummaryScreen", "Error descargando PDF: ${e.message}", e)
-            null
+        } else {
+            Log.w("SummaryScreen", "HTTP ${pdfConn.responseCode} desde $downloadUrl")
         }
+    } catch (e: Exception) {
+        Log.e("SummaryScreen", "Error descargando desde $downloadUrl: ${e.message}")
     }
+    return null
 }
