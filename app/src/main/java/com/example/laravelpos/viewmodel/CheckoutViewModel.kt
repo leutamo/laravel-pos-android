@@ -240,36 +240,60 @@ class CheckoutViewModel @Inject constructor(
             _isLoading.value = true
             _apiError.value = null
             try {
-                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
                 val currentDate = isoFormat.format(Date())
-                val totalIgv = totalAmount - (totalAmount / 1.18)
 
-                if (canManageSale) {
-                    // REALIZAR VENTA DIRECTA
-                    val saleItems = cartItems.map { cartItem ->
-                        val product = cartItem.product
-                        val quantity = cartItem.quantity
-                        val subTotal = cartItem.subTotal
-                        val unitPrice = cartItem.unitPrice
-                        val netUnitPrice = unitPrice / 1.18
-                        val taxAmount = subTotal - (netUnitPrice * quantity)
+                // Cálculo dinámico por ítem según la configuración del producto enviada por el servidor
+                var calculatedTotalTax = 0.0
+                var calculatedGrandTotal = 0.0
 
-                        SaleItem(
-                            productId = product.id,
-                            quantity = quantity,
-                            productPrice = String.format("%.2f", unitPrice),
-                            netUnitPrice = String.format("%.2f", netUnitPrice),
-                            taxType = 1,
-                            taxValue = "18.00",
-                            taxAmount = String.format("%.2f", taxAmount),
-                            discountType = 2,
-                            discountValue = "0.00",
-                            discountAmount = "0.00",
-                            saleUnit = cartItem.selectedConversion?.toUnitId ?: product.attributes.sale_unit_name.id,
-                            subTotal = String.format("%.2f", subTotal)
-                        )
+                val saleItems = cartItems.map { cartItem ->
+                    val product = cartItem.product
+                    val quantity = cartItem.quantity
+                    val unitPrice = cartItem.unitPrice
+                    val taxRate = product.attributes.parsedOrderTax
+                    val taxType = product.attributes.parsedTaxType
+
+                    val netUnitPrice: Double
+                    val itemTaxAmount: Double
+                    val itemSubTotal: Double
+
+                    if (taxRate <= 0.0) {
+                        netUnitPrice = unitPrice
+                        itemTaxAmount = 0.0
+                        itemSubTotal = unitPrice * quantity
+                    } else if (taxType == 2) { // Inclusive (IGV Incluido)
+                        netUnitPrice = unitPrice / (1.0 + taxRate / 100.0)
+                        val taxPerUnit = unitPrice - netUnitPrice
+                        itemTaxAmount = taxPerUnit * quantity
+                        itemSubTotal = unitPrice * quantity
+                    } else { // Exclusive (IGV No Incluido)
+                        netUnitPrice = unitPrice
+                        val taxPerUnit = unitPrice * (taxRate / 100.0)
+                        itemTaxAmount = taxPerUnit * quantity
+                        itemSubTotal = (unitPrice + taxPerUnit) * quantity
                     }
 
+                    calculatedTotalTax += itemTaxAmount
+                    calculatedGrandTotal += itemSubTotal
+
+                    SaleItem(
+                        productId = product.id,
+                        quantity = quantity,
+                        productPrice = String.format(Locale.US, "%.2f", unitPrice),
+                        netUnitPrice = String.format(Locale.US, "%.2f", netUnitPrice),
+                        taxType = taxType,
+                        taxValue = String.format(Locale.US, "%.2f", taxRate),
+                        taxAmount = String.format(Locale.US, "%.2f", itemTaxAmount),
+                        discountType = 2,
+                        discountValue = "0.00",
+                        discountAmount = "0.00",
+                        saleUnit = cartItem.selectedConversion?.toUnitId ?: product.attributes.sale_unit_name.id,
+                        subTotal = String.format(Locale.US, "%.2f", itemSubTotal)
+                    )
+                }
+
+                if (canManageSale) {
                     val activeCompanyId = billingCompanyRepository.getSavedActiveCompanyId()
                     val companyId = if (activeCompanyId > 0) activeCompanyId else null
 
@@ -278,11 +302,11 @@ class CheckoutViewModel @Inject constructor(
                         customerId = customerId,
                         warehouseId = 1,
                         companyId = companyId,
-                        taxRate = "18.00",
-                        taxAmount = String.format("%.2f", totalIgv),
+                        taxRate = "0.00",
+                        taxAmount = String.format(Locale.US, "%.2f", calculatedTotalTax),
                         discount = "0.00",
                         shipping = "0.00",
-                        grandTotal = String.format("%.2f", totalAmount),
+                        grandTotal = String.format(Locale.US, "%.2f", calculatedGrandTotal),
                         receivedAmount = "0.00",
                         paidAmount = "0.00",
                         paymentType = 1,
@@ -304,24 +328,37 @@ class CheckoutViewModel @Inject constructor(
                     val quotationItems = cartItems.map { cartItem ->
                         val product = cartItem.product
                         val quantity = cartItem.quantity
-                        val subTotal = cartItem.subTotal
                         val unitPrice = cartItem.unitPrice
-                        val netUnitPrice = unitPrice / 1.18
-                        val taxAmount = subTotal - (netUnitPrice * quantity)
+                        val taxRate = product.attributes.parsedOrderTax
+                        val taxType = product.attributes.parsedTaxType
+
+                        val netUnitPrice = if (taxRate > 0.0 && taxType == 2) {
+                            unitPrice / (1.0 + taxRate / 100.0)
+                        } else {
+                            unitPrice
+                        }
+                        val itemTaxAmount = if (taxRate > 0.0) {
+                            if (taxType == 2) (unitPrice - netUnitPrice) * quantity else (unitPrice * (taxRate / 100.0)) * quantity
+                        } else 0.0
+                        val itemSubTotal = if (taxRate > 0.0 && taxType == 1) {
+                            (unitPrice + unitPrice * (taxRate / 100.0)) * quantity
+                        } else {
+                            unitPrice * quantity
+                        }
 
                         QuotationItem(
                             productId = product.id,
                             quantity = quantity,
-                            productPrice = String.format("%.2f", unitPrice),
-                            netUnitPrice = String.format("%.2f", netUnitPrice),
-                            taxType = 1,
-                            taxValue = "18.00",
-                            taxAmount = String.format("%.2f", taxAmount),
+                            productPrice = String.format(Locale.US, "%.2f", unitPrice),
+                            netUnitPrice = String.format(Locale.US, "%.2f", netUnitPrice),
+                            taxType = taxType,
+                            taxValue = String.format(Locale.US, "%.2f", taxRate),
+                            taxAmount = String.format(Locale.US, "%.2f", itemTaxAmount),
                             discountType = 2,
                             discountValue = "0.00",
                             discountAmount = "0.00",
                             saleUnit = cartItem.selectedConversion?.toUnitId ?: product.attributes.sale_unit_name.id,
-                            subTotal = String.format("%.2f", subTotal)
+                            subTotal = String.format(Locale.US, "%.2f", itemSubTotal)
                         )
                     }
 
@@ -330,11 +367,11 @@ class CheckoutViewModel @Inject constructor(
                         customerId = customerId,
                         warehouseId = 1, 
                         status = 1,
-                        taxRate = "18.00",
-                        taxAmount = String.format("%.2f", totalIgv),
+                        taxRate = "0.00",
+                        taxAmount = String.format(Locale.US, "%.2f", calculatedTotalTax),
                         discount = "0.00",
                         shipping = "0.00",
-                        grandTotal = String.format("%.2f", totalAmount),
+                        grandTotal = String.format(Locale.US, "%.2f", calculatedGrandTotal),
                         receivedAmount = 0.0,
                         paidAmount = 0.0,
                         note = "Cotización desde App Android",

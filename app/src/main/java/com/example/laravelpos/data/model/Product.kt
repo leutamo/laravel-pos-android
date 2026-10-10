@@ -38,8 +38,8 @@ data class ProductAttributes(
     val purchase_unit: String,
     val stock_alert: String,
     val quantity_limit: String?,
-    val order_tax: Int?,
-    val tax_type: String?,
+    val order_tax: JsonElement? = null,
+    val tax_type: JsonElement? = null,
     val notes: String?,
     @Serializable(with = ProductImagesSerializer::class)
     val images: ProductImages? = null,
@@ -57,7 +57,31 @@ data class ProductAttributes(
     val in_stock: Double,
     val variation_product: VariationProduct? = null,
     val conversions: List<ProductConversion> = emptyList()
-)
+) {
+    val parsedOrderTax: Double
+        get() {
+            return try {
+                val element = order_tax ?: return 0.0
+                if (element is JsonPrimitive) {
+                    element.doubleOrNull ?: element.content.toDoubleOrNull() ?: 0.0
+                } else 0.0
+            } catch (e: Exception) {
+                0.0
+            }
+        }
+
+    val parsedTaxType: Int
+        get() {
+            return try {
+                val element = tax_type ?: return 1
+                if (element is JsonPrimitive) {
+                    element.intOrNull ?: element.content.toIntOrNull() ?: 1
+                } else 1
+            } catch (e: Exception) {
+                1
+            }
+        }
+}
 
 @Serializable
 data class ProductConversion(

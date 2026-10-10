@@ -181,15 +181,38 @@ class HomeViewModel @Inject constructor(
 
     // Variables para calcular el total y el IGV
     val totalAmount: StateFlow<Double> = _cartItems.map { items ->
-        items.sumOf { it.subTotal }
+        items.sumOf { cartItem ->
+            val product = cartItem.product
+            val taxRate = product.attributes.parsedOrderTax
+            val taxType = product.attributes.parsedTaxType
+            val unitPrice = cartItem.unitPrice
+            if (taxRate > 0.0 && taxType == 1) { // Exclusive: sumamos el impuesto al total
+                (unitPrice + unitPrice * (taxRate / 100.0)) * cartItem.quantity
+            } else {
+                unitPrice * cartItem.quantity
+            }
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = 0.0
     )
 
-    val igvAmount: StateFlow<Double> = totalAmount.map { total ->
-        total * 0.18 // Ejemplo de IGV del 18%
+    val igvAmount: StateFlow<Double> = _cartItems.map { items ->
+        items.sumOf { cartItem ->
+            val product = cartItem.product
+            val taxRate = product.attributes.parsedOrderTax
+            val taxType = product.attributes.parsedTaxType
+            val unitPrice = cartItem.unitPrice
+            if (taxRate <= 0.0) {
+                0.0
+            } else if (taxType == 2) { // Inclusive
+                val netUnit = unitPrice / (1.0 + taxRate / 100.0)
+                (unitPrice - netUnit) * cartItem.quantity
+            } else { // Exclusive
+                (unitPrice * (taxRate / 100.0)) * cartItem.quantity
+            }
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
