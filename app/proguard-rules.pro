@@ -1,21 +1,37 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ProGuard / R8 Rules for Laravel POS Android
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# SLF4J / Ktor Logging
+-dontwarn org.slf4j.**
+-keep class org.slf4j.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Ktor Client
+-dontwarn io.ktor.**
+-keep class io.ktor.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Kotlinx Serialization
+-keepattributes *Annotation*,ElementValueAttribute,Signature
+-keepnames class kotlinx.serialization.** { *; }
+-keepclassmembers class * {
+    @kotlinx.serialization.Serializable <fields>;
+}
+-keepclassmembers class * {
+    @kotlinx.serialization.SerialName <fields>;
+}
+-keepclassmembers class *$$serializer {
+    *** INSTANCE;
+}
+
+# Kotlin Coroutines
+-dontwarn kotlinx.coroutines.**
+-keep class kotlinx.coroutines.** { *; }
+
+# Coil
+-dontwarn coil.**
+-keep class coil.** { *; }
+
+# Hilt / Dagger
+-dontwarn dagger.**
+-keep class dagger.** { *; }
+
+# Models Data Classes
+-keep class com.example.laravelpos.data.model.** { *; }
