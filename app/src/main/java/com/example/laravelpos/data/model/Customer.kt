@@ -12,21 +12,21 @@ data class CustomerResponse(
 // y los atributos anidados.
 @Serializable
 data class Customer(
-    val type: String,
+    val type: String = "customers",
     val id: Int,
     val attributes: CustomerAttributes,
-    val links: CustomerLinks
+    val links: CustomerLinks = CustomerLinks(self = "")
 )
 
 // Contiene los datos reales del cliente, que vienen anidados dentro del objeto 'attributes'.
 @Serializable
 data class CustomerAttributes(
     val name: String,
-    val email: String,
-    val phone: String,
-    val country: String,
-    val city: String,
-    val address: String,
+    val email: String? = null,
+    val phone: String? = null,
+    val country: String? = "Perú",
+    val city: String? = null,
+    val address: String? = null,
     val dob: String? = null,
 
     // ✅ Campos de la migración de Laravel
@@ -41,5 +41,5 @@ data class CustomerAttributes(
 // Representa los enlaces de la API, si los hay.
 @Serializable
 data class CustomerLinks(
-    val self: String
+    val self: String = ""
 )

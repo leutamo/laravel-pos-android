@@ -19,6 +19,7 @@ import com.example.laravelpos.data.repository.DocumentTypeRepository
 import com.example.laravelpos.data.repository.LoginRepository
 import com.example.laravelpos.data.repository.QuotationRepository
 import com.example.laravelpos.data.repository.SaleRepository
+import com.example.laravelpos.data.repository.SearchCustomerResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -133,15 +134,18 @@ class CheckoutViewModel @Inject constructor(
 
                 if (dni.length == requiredLength && requiredLength > 0) {
                     // Solo buscamos si el DNI es diferente al del cliente ya cargado
-                    // para evitar bucles o sobreescritura al usar el botón "Genérico"
                     if (_customerData.value?.attributes?.document_number != dni) {
                         _isLoadingCustomer.value = true
                         try {
-                            val customer = customerRepository.searchCustomer(dni)
-                            if (customer != null) {
-                                _customerData.value = customer
-                            } else {
-                                _customerData.value = null
+                            when (val result = customerRepository.searchCustomer(dni)) {
+                                is SearchCustomerResult.Success -> {
+                                    _customerData.value = result.customer
+                                    Log.d("CheckoutViewModel", "Cliente obtenido (${result.customer.attributes.name}), ID: ${result.customer.id}")
+                                }
+                                is SearchCustomerResult.Error -> {
+                                    _customerData.value = null
+                                    _apiError.value = result.message
+                                }
                             }
                         } catch (e: Exception) {
                             Log.e("CheckoutViewModel", "Error al buscar cliente: ${e.message}")
@@ -232,7 +236,6 @@ class CheckoutViewModel @Inject constructor(
         selectedReceiptType: String?,
         cartItems: List<CartItem>
     ) {
-        val customerId = _customerData.value?.id ?: 6 
         val permissions = loginRepository.getUserPermissions()
         val canManageSale = permissions.contains("manage_sale")
 
@@ -240,6 +243,26 @@ class CheckoutViewModel @Inject constructor(
             _isLoading.value = true
             _apiError.value = null
             try {
+                var currentCustomer = _customerData.value
+
+                // Si el cliente proviene de RENIEC/SUNAT (id == 0), lo registramos Just-In-Time al cobrar
+                if (currentCustomer != null && currentCustomer.id == 0) {
+                    Log.d("CheckoutViewModel", "Cliente Just-In-Time id 0 detectado (${currentCustomer.attributes.name}). Guardando en backend antes de cobrar...")
+                    when (val createResult = customerRepository.createCustomer(currentCustomer)) {
+                        is CustomerResult.Success -> {
+                            currentCustomer = createResult.customer
+                            _customerData.value = currentCustomer
+                            Log.d("CheckoutViewModel", "Cliente guardado exitosamente con ID real: ${currentCustomer.id}")
+                        }
+                        is CustomerResult.Error -> {
+                            _apiError.value = "No se pudo registrar el cliente: ${createResult.message}"
+                            _isLoading.value = false
+                            return@launch
+                        }
+                    }
+                }
+
+                val customerId = currentCustomer?.id ?: 6 // Fallback a cliente genérico si no hay cliente
                 val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
                 val currentDate = isoFormat.format(Date())
 

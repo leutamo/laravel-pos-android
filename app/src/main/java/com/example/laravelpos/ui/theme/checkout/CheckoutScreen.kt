@@ -314,21 +314,36 @@ fun CheckoutScreen(
             
             // ✅ Información del Cliente Seleccionado
             customerData?.let { customer ->
+                val isExternal = customer.id == 0
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 12.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = if (isExternal)
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     )
                 ) {
                     Box(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "Datos del Cliente",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (isExternal) "Consulta RENIEC/SUNAT" else "Datos del Cliente",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (isExternal) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                                )
+                                if (isExternal) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "(Se guardará al cobrar)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = customer.attributes.name,
@@ -339,11 +354,22 @@ fun CheckoutScreen(
                                 text = "Doc: ${customer.attributes.document_number}",
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            if (customer.attributes.email.isNotEmpty()) {
-                                Text(
-                                    text = "Email: ${customer.attributes.email}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
+                            customer.attributes.email?.let { email ->
+                                if (email.isNotEmpty()) {
+                                    Text(
+                                        text = "Email: $email",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                            customer.attributes.address?.let { address ->
+                                if (address.isNotEmpty()) {
+                                    Text(
+                                        text = "Dirección: $address",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.Gray
+                                    )
+                                }
                             }
                         }
                         
