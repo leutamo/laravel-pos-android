@@ -1,112 +1,82 @@
-# Documentación del Flujo Multi-Empresa, Impuestos y Envío de PDF por WhatsApp (Laravel POS Android)
+# Documentación del Flujo Multi-Empresa, Impuestos, Clientes Just-In-Time y WhatsApp (Laravel POS Android)
 
 ## 1. Visión General
 
-Se ha integrado el soporte para **Multi-Empresa de Facturación Electrónica**, el **Cálculo Dinámico de Impuestos por Producto** y la funcionalidad de **Envío de Comprobantes PDF por WhatsApp** en la aplicación móvil Android. Esta solución permite que los cajeros o usuarios del POS puedan seleccionar con cuál empresa emisora desean facturar sus ventas (Boletas / Facturas / Notas de Venta), cobren el impuesto exacto configurado en la plataforma para cada producto y envíen el archivo PDF físico correspondiente a sus clientes.
+Se han integrado las siguientes funcionalidades clave en la aplicación móvil Android:
+- **Multi-Empresa de Facturación Electrónica**: Selección de la empresa emisora activa en el menú lateral.
+- **Consulta DNI/RUC y Registro Just-In-Time ("Al Cobrar")**: Búsqueda externa RENIEC/SUNAT y creación automática del cliente antes de emitir la venta.
+- **Cálculo Dinámico de Impuestos por Producto**: Mapeo de `order_tax` y `tax_type` desde la plataforma para prevenir doble cobro de IGV.
+- **Envío de PDF por WhatsApp**: Descarga física de comprobantes A4 SUNAT o Notas de Venta y envío como archivo `.pdf` adjunto.
 
 ---
 
-## 2. Endpoints de la API Integrados (API M1)
+## 2. Consulta DNI/RUC y Guardado Just-In-Time ("Al Cobrar")
 
-La app móvil se comunica con el backend mediante los siguientes endpoints autenticados con Bearer Token:
+### A. Búsqueda de Clientes (`GET /api/customers/search/{documentNumber}`)
+1. **DNI (8 dígitos) o RUC (11 dígitos)**:
+   - **Cliente en BD local (`customer.id > 0`)**: Recupera el cliente registrado en la tienda.
+   - **Cliente de Consulta Externa RENIEC/SUNAT (`customer.id == 0`)**: El backend devuelve `id: 0` con los datos de nombre/razón social, documento, dirección y ciudad en `customer.attributes`.
+   - **Error / No Encontrado (HTTP 422)**: Se captura el mensaje retornado (`message`), se muestra una alerta o mensaje al cajero y se permite continuar o ingresar un nuevo cliente.
+
+2. **Indicador Visual en la App (`CheckoutScreen.kt`)**:
+   - Cuando se selecciona un cliente de consulta externa (`id == 0`), la tarjeta de datos muestra el distintivo **"Consulta RENIEC/SUNAT (Se guardará al cobrar)"**.
+
+---
+
+### B. Proceso de Guardado "Al Cobrar" (`CheckoutViewModel.kt`)
+
+1. **Si `customer.id == 0`**:
+   - Al presionar **"Cobrar"**, la app ejecuta primero la petición `POST /api/customers` (o `/api/m1/customers`) enviando:
+     ```json
+     {
+       "name": customer.attributes.name,
+       "document_type_id": customer.attributes.document_type_id,
+       "document_number": customer.attributes.document_number,
+       "email": customer.attributes.email.ifBlank { null },
+       "phone": customer.attributes.phone.ifBlank { null },
+       "address": customer.attributes.address.ifBlank { null },
+       "city": customer.attributes.city.ifBlank { null },
+       "country": "Perú"
+     }
+     ```
+   - El backend guarda el cliente en la base de datos de la tienda y devuelve el nuevo `id > 0`.
+   - La app asigna este nuevo `id` como `customer_id` en el JSON de la venta (`SaleRequest`).
+
+2. **Si `customer.id > 0`**:
+   - Usa directamente `customer.id` para registrar la venta.
+
+3. **Flexibilidad de Campos y Limpieza**:
+   - `email` y `phone` son totalmente opcionales.
+   - Si el cajero cancela la venta antes de cobrar, el cliente con `id == 0` se descarta de la memoria del teléfono sin haber guardado nada en el servidor.
+
+---
+
+## 3. Endpoints de la API Integrados (API M1)
 
 ### A. Obtener Lista de Empresas Emisoras
-- **Ruta:** `GET /api/m1/billing-companies`
-- **Cabeceras:**
-  - `Authorization: Bearer {TOKEN}`
-  - `Accept: application/json`
-
----
+- `GET /api/m1/billing-companies`
 
 ### B. Establecer Empresa Activa del Usuario
-- **Ruta:** `POST /api/m1/user-active-company`
-- **Cuerpo (Request):** `{"company_id": 2}`
+- `POST /api/m1/user-active-company` -> `{"company_id": 2}`
+
+### C. Emisión de Venta
+- `POST /api/m1/sales` (o `/api/sales`) enviando `company_id` y `voucher_type` (`"nota_venta"`, `"03"`, `"01"`).
 
 ---
 
-### C. Emisión de Venta Especificando Empresa e Impuestos Dinámicos
-- **Ruta:** `POST /api/m1/sales` (o `POST /api/sales`)
-- **Estructura del Payload:**
-```json
-{
-  "date": "2026-09-28T17:00:00.000Z",
-  "customer_id": 1,
-  "warehouse_id": 1,
-  "company_id": 2,
-  "voucher_type": "nota_venta",
-  "tax_rate": "0.00",
-  "tax_amount": "1.80",
-  "grand_total": "11.80",
-  "sale_items": [
-    {
-      "product_id": 15,
-      "quantity": 1,
-      "product_price": "11.80",
-      "net_unit_price": "10.00",
-      "tax_type": 2,
-      "tax_value": "18.00",
-      "tax_amount": "1.80",
-      "sub_total": "11.80"
-    }
-  ]
-}
-```
+## 4. Lógica de Cálculo Dinámico de Impuestos (`order_tax` y `tax_type`)
+
+Cada producto se evalúa según sus atributos `order_tax` y `tax_type` devueltos por la plataforma:
+- **`order_tax <= 0.0` (Sin Impuesto / Exonerado)**: `taxAmount = 0.00`, `netUnitPrice = unitPrice`.
+- **`tax_type == 2` (Inclusive - IGV Incluido)**: `netUnitPrice = unitPrice / (1 + order_tax / 100)`.
+- **`tax_type == 1` (Exclusive - IGV No incluido)**: `netUnitPrice = unitPrice`, `taxAmount = unitPrice * (order_tax / 100)`.
+- En `SaleRequest`, `taxRate` se envía como `"0.00"` para evitar recálculos globales.
 
 ---
 
-## 3. Lógica de Cálculo Dinámico de Impuestos (`order_tax` y `tax_type`)
+## 5. Lógica de Descarga y Envío de PDF por WhatsApp
 
-Anteriormente la aplicación móvil tenía configurados impuestos estáticos de 18% Exclusive a nivel global, lo cual provocaba que el backend recalculara y **sumara doble impuesto** a productos no gravados (`order_tax = 0`).
-
-### A. Atributos del Producto leídos desde la Plataforma
-Cada producto devuelto por `GET /api/products` contiene:
-- `order_tax`: Porcentaje de impuesto configurado en la plataforma (ej. `0.00` para exonerado/inafecto o `18.00` para IGV).
-- `tax_type`: Tipo de impuesto (`1` = Exclusive / Impuesto no incluido, `2` = Inclusive / Impuesto incluido).
-
-### B. Reglas de Cálculo en la App (`Product.kt`, `HomeViewModel.kt`, `CheckoutViewModel.kt`)
-
-1. **Si `order_tax <= 0.0` (Producto sin Impuesto / 0% / Exonerado)**:
-   - `netUnitPrice` = `productPrice`
-   - `taxAmount` = `0.00`
-   - `subTotal` = `productPrice * quantity`
-   - No se agrega ningún impuesto adicional.
-
-2. **Si `tax_type == 2` (Inclusive - IGV Incluido en el precio)**:
-   - `netUnitPrice` = `productPrice / (1 + order_tax / 100)`
-   - `taxAmount` = `(productPrice - netUnitPrice) * quantity`
-   - `subTotal` = `productPrice * quantity`
-
-3. **Si `tax_type == 1` (Exclusive - IGV No incluido)**:
-   - `netUnitPrice` = `productPrice`
-   - `taxAmount` = `(productPrice * order_tax / 100) * quantity`
-   - `subTotal` = `(productPrice + taxAmountPerUnit) * quantity`
-
-4. **Nivel Global de la Venta (`SaleRequest`)**:
-   - `tax_rate` se envía como `"0.00"` para evitar que la plataforma vuelva a calcular un impuesto global adicional sobre el total.
-   - `tax_amount` es la suma exacta de los `tax_amount` individuales de cada producto.
-
----
-
-## 4. Lógica de Descarga y Envío de PDF por WhatsApp
-
-Se ha implementado un flujo en `SummaryScreen.kt` (`downloadDocumentPdf`) para enviar el archivo PDF físico correspondiente como documento adjunto a través de WhatsApp (`com.whatsapp` / `com.whatsapp.w4b`).
-
-### A. Diferenciación de Tipos de Documentos y Resolutores de PDF
-
-1. **Comprobantes Electrónicos SUNAT (Boleta / Factura)**:
-   - Utiliza `attr.electronicDocument.pdfUrl` devuelta por el servidor o la ruta pública `/api/sales/{sale_id}/sunat-pdf`.
-
-2. **Notas de Venta Internas**:
-   - Invoca el endpoint interno de generación de PDF: `GET /api/sale-pdf-download/{sale_id}`.
-   - Extrae la propiedad `data.sale_pdf_url` de la respuesta JSON para descargar el archivo.
-
-3. **Cotizaciones**:
-   - Invoca `GET /api/quotation-pdf-download/{quotation_id}` y extrae `data.quotation_pdf_url`.
-
----
-
-### B. Proceso de Descarga y Envío Adjunto en Android
-
-1. **Descarga en Caché Local**: Descarga los bytes a `cacheDir/Documento_SA_XXXX.pdf`.
-2. **FileProvider**: Expone el URI seguro `content://com.example.laravelpos.fileprovider/pdf_cache/...`.
-3. **Intent de Envío a WhatsApp**: Asigna el MIME `application/pdf`, pasa el URI mediante `EXTRA_STREAM`, incluye la leyenda con `caption` y `EXTRA_TEXT`, y fija el paquete `com.whatsapp` / `com.whatsapp.w4b`.
+- **Comprobante SUNAT (Boleta/Factura)**: Descarga desde `/api/sales/{id}/sunat-pdf`.
+- **Nota de Venta**: Descarga desde `/api/sale-pdf-download/{id}`.
+- **Cotización**: Descarga desde `/api/quotation-pdf-download/{id}`.
+- La app valida la firma binaria `%PDF` del archivo descargado en `cacheDir` antes de entregarlo a WhatsApp con `FileProvider`.
