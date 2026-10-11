@@ -531,7 +531,7 @@ fun CheckoutScreen(
                             OutlinedTextField(
                                 value = email,
                                 onValueChange = { email = it },
-                                label = { Text("Email *") },
+                                label = { Text("Email (Opcional)") },
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                             )
@@ -539,7 +539,7 @@ fun CheckoutScreen(
                             OutlinedTextField(
                                 value = phone,
                                 onValueChange = { phone = it },
-                                label = { Text("Teléfono *") },
+                                label = { Text("Teléfono (Opcional)") },
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
                             )
@@ -547,7 +547,7 @@ fun CheckoutScreen(
                             OutlinedTextField(
                                 value = address,
                                 onValueChange = { address = it },
-                                label = { Text("Dirección *") },
+                                label = { Text("Dirección (Opcional)") },
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -555,7 +555,7 @@ fun CheckoutScreen(
                     confirmButton = {
                         Button(
                             onClick = {
-                                if (name.isBlank() || email.isBlank() || phone.isBlank()) {
+                                if (name.isBlank()) {
                                     return@Button
                                 }
 
@@ -564,14 +564,14 @@ fun CheckoutScreen(
                                     type = "customers",
                                     id = 0,
                                     attributes = CustomerAttributes(
-                                        name = name,
-                                        email = email,
-                                        phone = phone,
-                                        country = country,
-                                        city = city,
-                                        address = address,
+                                        name = name.trim(),
+                                        email = email.trim().ifBlank { null },
+                                        phone = phone.trim().ifBlank { null },
+                                        country = country.trim().ifBlank { "Perú" },
+                                        city = city.trim().ifBlank { "Lima" },
+                                        address = address.trim().ifBlank { null },
                                         dob = null,
-                                        document_number = documentNumber,
+                                        document_number = documentNumber.trim(),
                                         document_type_id = documentTypeId,
                                         created_at = currentTime,
                                         updated_at = currentTime
