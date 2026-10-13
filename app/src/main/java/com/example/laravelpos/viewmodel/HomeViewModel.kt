@@ -3,31 +3,32 @@ package com.example.laravelpos.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.laravelpos.data.model.Product
+import com.example.laravelpos.data.config.ServerConfig
 import com.example.laravelpos.data.model.CartItem
+import com.example.laravelpos.data.model.Product
 import com.example.laravelpos.data.model.ProductConversion
 import com.example.laravelpos.data.model.QuotationItem
 import com.example.laravelpos.data.model.QuotationRequest
+import com.example.laravelpos.data.model.WarehouseItem
 import com.example.laravelpos.data.repository.ProductRepository
 import com.example.laravelpos.data.repository.QuotationRepository
-import com.example.laravelpos.data.config.ServerConfig
+import com.example.laravelpos.data.repository.WarehouseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.FlowPreview
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import javax.inject.Inject
 
 private const val TAG = "HomeViewModel"
 
@@ -35,27 +36,23 @@ private const val TAG = "HomeViewModel"
 class HomeViewModel @Inject constructor(
     private val repository: ProductRepository,
     private val quotationRepository: QuotationRepository,
+    private val warehouseRepository: WarehouseRepository,
     private val serverConfig: ServerConfig
 ) : ViewModel() {
     private val _products = MutableStateFlow<List<Product>>(emptyList())
     val products: StateFlow<List<Product>> = _products.asStateFlow()
 
     fun getFullImageUrl(relativePath: String?): String {
-        val fullUrl = serverConfig.getFullImageUrl(relativePath)
-        if (!relativePath.isNullOrBlank()) {
-            Log.d(TAG, "Generating image URL: $fullUrl (from original: $relativePath)")
-        }
-        return fullUrl
+        return serverConfig.getFullImageUrl(relativePath)
     }
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    // Estado para los ítems del carrito (Refactorizado a CartItem)
+    // Estado para los ítems del carrito
     private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
     val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
 
-    // PAra completar la navegacion
     private val _navigateToSummary = MutableStateFlow<Int?>(null)
     val navigateToSummary: StateFlow<Int?> = _navigateToSummary.asStateFlow()
 
@@ -66,6 +63,19 @@ class HomeViewModel @Inject constructor(
     private val _showReceiptModal = MutableStateFlow(false)
     val showReceiptModal: StateFlow<Boolean> = _showReceiptModal.asStateFlow()
 
+    // Estados para almacenes (Warehouses)
+    private val _warehouses = MutableStateFlow<List<WarehouseItem>>(emptyList())
+    val warehouses: StateFlow<List<WarehouseItem>> = _warehouses.asStateFlow()
+
+    private val _activeWarehouse = MutableStateFlow<WarehouseItem?>(null)
+    val activeWarehouse: StateFlow<WarehouseItem?> = _activeWarehouse.asStateFlow()
+
+    private val _isLoadingWarehouses = MutableStateFlow(false)
+    val isLoadingWarehouses: StateFlow<Boolean> = _isLoadingWarehouses.asStateFlow()
+
+    private val _showConfirmClearCartDialog = MutableStateFlow<WarehouseItem?>(null)
+    val showConfirmClearCartDialog: StateFlow<WarehouseItem?> = _showConfirmClearCartDialog.asStateFlow()
+
     // Estados para la llamada a la API
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -73,12 +83,12 @@ class HomeViewModel @Inject constructor(
     private val _apiError = MutableStateFlow<String?>(null)
     val apiError: StateFlow<String?> = _apiError.asStateFlow()
 
-    // La lista filtrada ahora simplemente expone lo que devuelve el servidor
+    // La lista filtrada expone los productos devueltos
     val filteredProducts: StateFlow<List<Product>> = _products.asStateFlow()
 
     init {
-        Log.d(TAG, "ViewModel initialized, fetching initial products")
-        fetchProducts("")
+        Log.d(TAG, "ViewModel initialized, loading warehouses and initial products")
+        loadWarehouses()
 
         @OptIn(FlowPreview::class)
         viewModelScope.launch {
@@ -91,15 +101,64 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun loadWarehouses() {
+        viewModelScope.launch {
+            _isLoadingWarehouses.value = true
+            try {
+                val list = warehouseRepository.getWarehouses()
+                _warehouses.value = list
+
+                val savedId = warehouseRepository.getSavedActiveWarehouseId()
+                var current = list.find { it.id == savedId }
+                if (current == null) {
+                    current = list.find { it.isDefault } ?: list.firstOrNull()
+                }
+
+                if (current != null) {
+                    _activeWarehouse.value = current
+                    warehouseRepository.saveSelectedWarehouse(current)
+                }
+                fetchProducts()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading warehouses: ${e.message}")
+            } finally {
+                _isLoadingWarehouses.value = false
+            }
+        }
+    }
+
+    fun selectWarehouse(warehouseItem: WarehouseItem) {
+        if (warehouseItem.id == _activeWarehouse.value?.id) return
+
+        if (_cartItems.value.isNotEmpty()) {
+            _showConfirmClearCartDialog.value = warehouseItem
+        } else {
+            confirmWarehouseChange(warehouseItem)
+        }
+    }
+
+    fun confirmWarehouseChange(warehouseItem: WarehouseItem) {
+        clearCart()
+        _activeWarehouse.value = warehouseItem
+        warehouseRepository.saveSelectedWarehouse(warehouseItem)
+        _showConfirmClearCartDialog.value = null
+        fetchProducts()
+    }
+
+    fun cancelWarehouseChange() {
+        _showConfirmClearCartDialog.value = null
+    }
+
     fun fetchProducts(search: String? = _searchQuery.value) {
         viewModelScope.launch {
             _isLoading.value = true
             _apiError.value = null
-            Log.d(TAG, "fetchProducts: Requesting products from server (search: $search)...")
-            val result = repository.getProducts(search)
+            val activeWarehouseId = _activeWarehouse.value?.id
+            Log.d(TAG, "fetchProducts: Requesting products (search: $search, warehouse_id: $activeWarehouseId)...")
+            val result = repository.getProducts(search, activeWarehouseId)
             
             result.onSuccess { productList ->
-                Log.d(TAG, "Server responded with ${productList.size} products")
+                Log.d(TAG, "Server responded with ${productList.size} products for warehouse $activeWarehouseId")
                 _products.value = productList
             }.onFailure { exception ->
                 Log.e(TAG, "Error fetching products: ${exception.message}")
@@ -114,10 +173,8 @@ class HomeViewModel @Inject constructor(
         _searchQuery.update { query }
     }
 
-
     // Función para agregar un producto al carrito
     fun addItemToCart(product: Product) {
-        // Limpiamos la búsqueda al agregar un producto
         onSearchQueryChanged("")
 
         _cartItems.update { currentItems ->
@@ -174,7 +231,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Compatibilidad para UI que busca por producto
     fun getProductCount(product: Product): Double {
         return _cartItems.value.filter { it.product.id == product.id }.sumOf { it.quantity }
     }
@@ -186,7 +242,7 @@ class HomeViewModel @Inject constructor(
             val taxRate = product.attributes.parsedOrderTax
             val taxType = product.attributes.parsedTaxType
             val unitPrice = cartItem.unitPrice
-            if (taxRate > 0.0 && taxType == 1) { // Exclusive: sumamos el impuesto al total
+            if (taxRate > 0.0 && taxType == 1) {
                 (unitPrice + unitPrice * (taxRate / 100.0)) * cartItem.quantity
             } else {
                 unitPrice * cartItem.quantity
@@ -206,10 +262,10 @@ class HomeViewModel @Inject constructor(
             val unitPrice = cartItem.unitPrice
             if (taxRate <= 0.0) {
                 0.0
-            } else if (taxType == 2) { // Inclusive
+            } else if (taxType == 2) {
                 val netUnit = unitPrice / (1.0 + taxRate / 100.0)
                 (unitPrice - netUnit) * cartItem.quantity
-            } else { // Exclusive
+            } else {
                 (unitPrice * (taxRate / 100.0)) * cartItem.quantity
             }
         }
@@ -223,9 +279,6 @@ class HomeViewModel @Inject constructor(
         _cartItems.value = emptyList()
     }
 
-    /**
-     * Modal Tipo de comprobante
-     */
     fun showReceiptModal() {
         _showReceiptModal.value = true
     }
@@ -239,31 +292,24 @@ class HomeViewModel @Inject constructor(
         hideReceiptModal()
     }
 
-    // Nueva función para borrar el error
     fun clearApiError() {
         _apiError.value = null
     }
 
-
-    // Nueva función para procesar el pago y hacer la llamada a la API
     fun processCheckout() {
         viewModelScope.launch {
             _isLoading.value = true
-            _apiError.value = null // Limpiar errores anteriores
+            _apiError.value = null
             try {
-                // Obtener los datos del carrito
                 val items = _cartItems.value
                 val currentTotal = totalAmount.value
                 val currentIgv = igvAmount.value
 
-                // Construir la lista de items para la petición
                 val quotationItems = items.map { cartItem ->
                     val product = cartItem.product
                     val quantity = cartItem.quantity
                     val subTotal = cartItem.subTotal
                     val unitPrice = cartItem.unitPrice
-                    
-                    // Calculamos el precio neto (sin IGV) para coincidir con la plataforma
                     val netUnitPrice = unitPrice / 1.18
                     val taxAmount = subTotal - (netUnitPrice * quantity)
 
@@ -283,15 +329,14 @@ class HomeViewModel @Inject constructor(
                     )
                 }
 
-                // Obtener la fecha en formato ISO (como en la plataforma)
                 val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
                 val currentDate = isoFormat.format(Date())
+                val activeWarehouseId = _activeWarehouse.value?.id ?: 1
 
-                // Construir el cuerpo de la petición basado en los screenshots
                 val requestBody = QuotationRequest(
                     date = currentDate,
                     customerId = 6, 
-                    warehouseId = 1, 
+                    warehouseId = activeWarehouseId, 
                     status = 1, 
                     taxRate = "18.00",
                     taxAmount = String.format("%.2f", currentIgv),
@@ -304,14 +349,12 @@ class HomeViewModel @Inject constructor(
                     quotationItems = quotationItems
                 )
 
-                // Realizar la llamada a la API
                 val response = quotationRepository.createQuotation(requestBody)
 
-                // Manejar la respuesta
                 if (response.success) {
                     Log.d(TAG, "Cotización creada con éxito: ${response.data?.id}")
                     _navigateToSummary.value = response.data?.id
-                    clearCart() // Limpiamos el carrito tras éxito
+                    clearCart()
                 } else {
                     _apiError.value = response.message
                     Log.e(TAG, "Error al crear cotización: ${response.message}")

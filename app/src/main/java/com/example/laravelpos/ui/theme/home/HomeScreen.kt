@@ -25,10 +25,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,7 +49,9 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -60,7 +65,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -91,6 +95,11 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
     val isLoadingCompanies by viewModel.isLoadingCompanies.collectAsState()
     val companyError by viewModel.companyError.collectAsState()
 
+    val warehouses by homeViewModel.warehouses.collectAsState()
+    val activeWarehouse by homeViewModel.activeWarehouse.collectAsState()
+    val isLoadingWarehouses by homeViewModel.isLoadingWarehouses.collectAsState()
+    val showConfirmClearCartDialog by homeViewModel.showConfirmClearCartDialog.collectAsState()
+
     val cartItems by homeViewModel.cartItems.collectAsState()
     val cartItemCount = cartItems.size
 
@@ -117,6 +126,30 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 popUpTo("home") { inclusive = true }
             }
         }
+    }
+
+    // ✅ Diálogo de confirmación para vaciar carrito al cambiar de almacén
+    showConfirmClearCartDialog?.let { pendingWarehouse ->
+        AlertDialog(
+            onDismissRequest = { homeViewModel.cancelWarehouseChange() },
+            title = { Text("¿Cambiar de Almacén?") },
+            text = {
+                Text("Al cambiar de almacén a '${pendingWarehouse.name}' se vaciará el carrito actual para recalcular las existencias. ¿Deseas continuar?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = { homeViewModel.confirmWarehouseChange(pendingWarehouse) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Cambiar y vaciar carrito")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { homeViewModel.cancelWarehouseChange() }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     ModalNavigationDrawer(
@@ -273,6 +306,101 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+                // ✅ Selector de Almacén de Trabajo en el Drawer
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    Text(
+                        text = "Almacén de Trabajo:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (isLoadingWarehouses && warehouses.isEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Cargando almacenes...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else if (warehouses.isNotEmpty()) {
+                        var expandedWarehouseMenu by remember { mutableStateOf(false) }
+
+                        Box {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { expandedWarehouseMenu = true },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Home,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = activeWarehouse?.name ?: "Seleccionar Almacén",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = "Cambiar almacén"
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = expandedWarehouseMenu,
+                                onDismissRequest = { expandedWarehouseMenu = false }
+                            ) {
+                                warehouses.forEach { wh ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = wh.name,
+                                                fontWeight = if (wh.id == activeWarehouse?.id) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            homeViewModel.selectWarehouse(wh)
+                                            expandedWarehouseMenu = false
+                                        },
+                                        leadingIcon = {
+                                            RadioButton(
+                                                selected = (wh.id == activeWarehouse?.id),
+                                                onClick = null
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = activeWarehouse?.name ?: "Almacén Principal",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
                 NavigationDrawerItem(
                     label = { Text("Mis Permisos") },
                     selected = false,
@@ -309,6 +437,71 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                 .fillMaxSize()
                 .padding(WindowInsets.systemBars.asPaddingValues())
         ) {
+            // ✅ Selector Rápido de Almacén en la Cabecera del POS
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                var expandedHeaderWh by remember { mutableStateOf(false) }
+
+                Box {
+                    Surface(
+                        onClick = { expandedHeaderWh = true },
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        tonalElevation = 1.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "📍 ${activeWarehouse?.name ?: "Almacén Principal"}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Cambiar Almacén",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = expandedHeaderWh,
+                        onDismissRequest = { expandedHeaderWh = false }
+                    ) {
+                        warehouses.forEach { wh ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = wh.name,
+                                        fontWeight = if (wh.id == activeWarehouse?.id) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                onClick = {
+                                    homeViewModel.selectWarehouse(wh)
+                                    expandedHeaderWh = false
+                                },
+                                leadingIcon = {
+                                    RadioButton(
+                                        selected = (wh.id == activeWarehouse?.id),
+                                        onClick = null
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             // Search bar and Icons
             Row(
                 modifier = Modifier
@@ -458,8 +651,9 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 maxLines = 2
                                             )
+                                            val stockVal = product.attributes.displayStock
                                             Text(
-                                                text = "Stock: ${product.attributes.stock?.quantity?.let { if (it % 1.0 == 0.0) String.format("%.0f", it) else it.toString() } ?: "0"}",
+                                                text = "Stock: ${if (stockVal % 1.0 == 0.0) String.format("%.0f", stockVal) else stockVal.toString()}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = Color.Gray
                                             )

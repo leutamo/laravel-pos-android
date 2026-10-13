@@ -55,9 +55,12 @@ data class ProductAttributes(
     val warehouse: List<Warehouse>,
     val barcode_url: String,
     val in_stock: Double,
+    @SerialName("remaining_quantity") val remainingQuantity: Double? = null,
     val variation_product: VariationProduct? = null,
     val conversions: List<ProductConversion> = emptyList()
 ) {
+    val displayStock: Double
+        get() = remainingQuantity ?: stock?.quantity ?: in_stock
     val parsedOrderTax: Double
         get() {
             return try {

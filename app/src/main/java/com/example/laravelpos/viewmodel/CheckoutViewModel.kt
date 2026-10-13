@@ -20,6 +20,7 @@ import com.example.laravelpos.data.repository.LoginRepository
 import com.example.laravelpos.data.repository.QuotationRepository
 import com.example.laravelpos.data.repository.SaleRepository
 import com.example.laravelpos.data.repository.SearchCustomerResult
+import com.example.laravelpos.data.repository.WarehouseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +43,8 @@ class CheckoutViewModel @Inject constructor(
     private val customerRepository: CustomerRepository,
     private val saleRepository: SaleRepository,
     private val loginRepository: LoginRepository,
-    private val billingCompanyRepository: BillingCompanyRepository
+    private val billingCompanyRepository: BillingCompanyRepository,
+    private val warehouseRepository: WarehouseRepository
 ) : ViewModel() {
 
     // Estado para tipos de documento
@@ -320,18 +322,20 @@ class CheckoutViewModel @Inject constructor(
                     val activeCompanyId = billingCompanyRepository.getSavedActiveCompanyId()
                     val companyId = if (activeCompanyId > 0) activeCompanyId else null
 
+                    val activeWarehouseId = warehouseRepository.getSavedActiveWarehouseId()
+                    val warehouseId = if (activeWarehouseId > 0) activeWarehouseId else 1
+
                     val mappedVoucherType = when (selectedReceiptType?.lowercase()?.trim()) {
                         "nota de venta", "nota_venta", "nota", "ticket" -> "nota_venta"
                         "boleta de venta", "boleta", "03" -> "03"
                         "factura", "01" -> "01"
                         else -> "nota_venta"
                     }
-                    
 
                     val request = SaleRequest(
                         date = currentDate,
                         customerId = customerId,
-                        warehouseId = 1,
+                        warehouseId = warehouseId,
                         companyId = companyId,
                         voucherType = mappedVoucherType,
                         taxRate = "0.00",
@@ -394,10 +398,13 @@ class CheckoutViewModel @Inject constructor(
                         )
                     }
 
+                    val activeWarehouseId = warehouseRepository.getSavedActiveWarehouseId()
+                    val warehouseId = if (activeWarehouseId > 0) activeWarehouseId else 1
+
                     val request = QuotationRequest(
                         date = currentDate,
                         customerId = customerId,
-                        warehouseId = 1, 
+                        warehouseId = warehouseId,
                         status = 1,
                         taxRate = "0.00",
                         taxAmount = String.format(Locale.US, "%.2f", calculatedTotalTax),

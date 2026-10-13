@@ -31,12 +31,12 @@ class ProductRepository @Inject constructor(
         val message: String
     )
 
-    suspend fun getProducts(search: String? = null): Result<List<Product>> {
+    suspend fun getProducts(search: String? = null, warehouseId: Int? = null): Result<List<Product>> {
         val token = sharedPreferences.getString(TOKEN_KEY, null)
         return withContext(Dispatchers.IO) {
             if (token != null) {
                 try {
-                    val response = client.get("products") {
+                    val response = client.get("m1/products") {
                         header("Authorization", "Bearer $token")
                         // El backend usa page[size] para la cantidad de elementos
                         parameter("page[size]", "100")
@@ -45,6 +45,11 @@ class ProductRepository @Inject constructor(
                         // Si hay una búsqueda, la enviamos al servidor
                         if (!search.isNullOrBlank()) {
                             parameter("filter[search]", search)
+                        }
+
+                        // Filtrar stock por almacén específico
+                        if (warehouseId != null && warehouseId > 0) {
+                            parameter("warehouse_id", warehouseId.toString())
                         }
                     }
                     val responseText = response.bodyAsText()
