@@ -1,6 +1,11 @@
 package com.example.laravelpos.ui.theme.home
 
 import android.util.Log
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.repeatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +54,8 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -65,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -107,7 +114,10 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
 
     val searchQuery by homeViewModel.searchQuery.collectAsState()
     var searchText by remember { mutableStateOf(TextFieldValue(searchQuery)) }
-    
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    var shakingProductId by remember { mutableStateOf<Int?>(null) }
+
     // Sincronizar el estado local del TextField con el ViewModel
     LaunchedEffect(searchQuery) {
         if (searchQuery != searchText.text) {
@@ -432,204 +442,238 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(WindowInsets.systemBars.asPaddingValues())
-        ) {
-            // Search bar and Icons
-            Row(
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .padding(WindowInsets.systemBars.asPaddingValues())
             ) {
-                IconButton(onClick = {
-                    scope.launch { drawerState.open() }
-                }) {
-                    Icon(Icons.Default.Menu, contentDescription = "Abrir menú")
-                }
-
-                OutlinedTextField(
-                    value = searchText,
-                    onValueChange = {
-                        searchText = it
-                        homeViewModel.onSearchQueryChanged(it.text)
-                    },
-                    label = { Text("Buscar producto...") },
+                // Search bar and Icons
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
-                    trailingIcon = {
-                        if (searchText.text.isNotEmpty()) {
-                            IconButton(onClick = {
-                                searchText = TextFieldValue("")
-                                homeViewModel.onSearchQueryChanged("")
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Limpiar búsqueda"
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        scope.launch { drawerState.open() }
+                    }) {
+                        Icon(Icons.Default.Menu, contentDescription = "Abrir menú")
+                    }
+
+                    OutlinedTextField(
+                        value = searchText,
+                        onValueChange = {
+                            searchText = it
+                            homeViewModel.onSearchQueryChanged(it.text)
+                        },
+                        label = { Text("Buscar producto...") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                        trailingIcon = {
+                            if (searchText.text.isNotEmpty()) {
+                                IconButton(onClick = {
+                                    searchText = TextFieldValue("")
+                                    homeViewModel.onSearchQueryChanged("")
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Limpiar búsqueda"
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true
+                    )
+
+                    // Shopping cart icon and counter
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .padding(start = 4.dp)
+                            .clickable {
+                                navController.navigate("cart")
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCart,
+                            contentDescription = "Carrito de compras",
+                            modifier = Modifier.size(28.dp)
+                        )
+                        if (cartItemCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .background(Color.Red, shape = MaterialTheme.shapes.extraSmall)
+                                    .align(Alignment.TopEnd)
+                            ) {
+                                Text(
+                                    text = cartItemCount.toString(),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.align(Alignment.Center)
                                 )
                             }
                         }
-                    },
-                    singleLine = true
-                )
-
-                // Shopping cart icon and counter
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .padding(start = 4.dp)
-                        .clickable {
-                            navController.navigate("cart")
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ShoppingCart,
-                        contentDescription = "Carrito de compras",
-                        modifier = Modifier.size(28.dp)
-                    )
-                    if (cartItemCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .background(Color.Red, shape = MaterialTheme.shapes.extraSmall)
-                                .align(Alignment.TopEnd)
-                        ) {
-                            Text(
-                                text = cartItemCount.toString(),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
-                        }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-            // PullToRefreshBox for the product grid
-            PullToRefreshBox(
-                isRefreshing = isRefreshing,
-                onRefresh = {
-                    scope.launch {
-                        isRefreshing = true
-                        homeViewModel.fetchProducts()
-                        delay(1000)
-                        isRefreshing = false
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            ) {
-                if (isLoading && filteredProducts.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 80.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(44.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 3.dp
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Cargando productos...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                // PullToRefreshBox for the product grid
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = {
+                        scope.launch {
+                            isRefreshing = true
+                            homeViewModel.fetchProducts()
+                            delay(1000)
+                            isRefreshing = false
                         }
-                    }
-                } else {
-                    // Product grid
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(filteredProducts, key = { it.id }) { product ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        homeViewModel.addItemToCart(product)
-                                    },
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (isLoading && filteredProducts.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 80.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
-                                Column(
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(44.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 3.dp
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Cargando productos...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        // Product grid
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(filteredProducts, key = { it.id }) { product ->
+                                val stockVal = product.attributes.displayStock
+                                val isOutOfStock = stockVal <= 0.0
+
+                                val shakeAnim by animateFloatAsState(
+                                    targetValue = if (shakingProductId == product.id) 10f else 0f,
+                                    animationSpec = repeatable(
+                                        iterations = 5,
+                                        animation = tween(durationMillis = 40, easing = LinearEasing),
+                                        repeatMode = RepeatMode.Reverse
+                                    ),
+                                    finishedListener = { shakingProductId = null },
+                                    label = "shakeAnim"
+                                )
+
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(8.dp)
+                                        .graphicsLayer { translationX = if (shakingProductId == product.id) shakeAnim else 0f }
+                                        .clickable {
+                                            val currentInCart = homeViewModel.getProductCount(product)
+                                            if (isOutOfStock || currentInCart + 1.0 > stockVal) {
+                                                shakingProductId = product.id
+                                                scope.launch {
+                                                    val msg = if (isOutOfStock) {
+                                                        "Stock insuficiente: '${product.attributes.name}' no tiene existencias disponibles."
+                                                    } else {
+                                                        "Stock máximo alcanzado (${if (stockVal % 1.0 == 0.0) String.format("%.0f", stockVal) else stockVal.toString()}) para '${product.attributes.name}'."
+                                                    }
+                                                    snackbarHostState.showSnackbar(msg)
+                                                }
+                                            } else {
+                                                homeViewModel.addItemToCart(product)
+                                            }
+                                        },
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                    colors = if (isOutOfStock)
+                                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    else
+                                        CardDefaults.cardColors()
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        AsyncImage(
-                                            model = homeViewModel.getFullImageUrl(product.attributes.images?.imageUrls?.firstOrNull()),
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .size(60.dp)
-                                                .padding(end = 8.dp)
-                                        )
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = product.attributes.name,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                maxLines = 2
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(8.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            AsyncImage(
+                                                model = homeViewModel.getFullImageUrl(product.attributes.images?.imageUrls?.firstOrNull()),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(60.dp)
+                                                    .padding(end = 8.dp)
                                             )
-                                            val stockVal = product.attributes.displayStock
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = product.attributes.name,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    maxLines = 2
+                                                )
+                                                Text(
+                                                    text = if (isOutOfStock) "Sin Stock (0)" else "Stock: ${if (stockVal % 1.0 == 0.0) String.format("%.0f", stockVal) else stockVal.toString()}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = if (isOutOfStock) Color.Red else Color.Gray,
+                                                    fontWeight = if (isOutOfStock) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        HorizontalDivider()
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
                                             Text(
-                                                text = "Stock: ${if (stockVal % 1.0 == 0.0) String.format("%.0f", stockVal) else stockVal.toString()}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = Color.Gray
+                                                text = product.attributes.sale_unit_name.name.uppercase(),
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                            Text(
+                                                text = "S/ ${product.attributes.product_price}",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = if (isOutOfStock) Color.Gray else MaterialTheme.colorScheme.primary
                                             )
                                         }
                                     }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    HorizontalDivider()
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = product.attributes.sale_unit_name.name.uppercase(),
-                                            style = MaterialTheme.typography.labelSmall
-                                        )
-                                        Text(
-                                            text = "S/ ${product.attributes.product_price}",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
                                 }
                             }
-                        }
-                        if (filteredProducts.isEmpty() && !isLoading) {
-                            item(span = { GridItemSpan(2) }) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize().padding(top = 100.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text(
-                                        text = apiError ?: "No se encontraron productos",
-                                        modifier = Modifier.padding(16.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (apiError != null) Color.Red else Color.Gray,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    Button(onClick = { homeViewModel.fetchProducts() }) {
-                                        Text("Actualizar")
+                            if (filteredProducts.isEmpty() && !isLoading) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize().padding(top = 100.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = apiError ?: "No se encontraron productos",
+                                            modifier = Modifier.padding(16.dp),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (apiError != null) Color.Red else Color.Gray,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Button(onClick = { homeViewModel.fetchProducts() }) {
+                                            Text("Actualizar")
+                                        }
                                     }
                                 }
                             }
@@ -637,6 +681,13 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                     }
                 }
             }
+
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+            )
         }
     }
 }
