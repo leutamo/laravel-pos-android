@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -303,15 +304,21 @@ fun CartItemCard(cartItem: CartItem, homeViewModel: HomeViewModel) {
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(
-                            text = "Precio Unit: S/ ${String.format("%.2f", cartItem.unitPrice)}",
+                            text = "Precio: S/ ${String.format("%.2f", cartItem.unitPrice)}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
+                            color = Color.Gray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         IconButton(
                             onClick = { showPriceDialog = true },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
