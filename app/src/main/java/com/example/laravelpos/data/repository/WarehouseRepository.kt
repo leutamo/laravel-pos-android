@@ -27,19 +27,37 @@ class WarehouseRepository @Inject constructor(
         val token = sharedPreferences.getString(TOKEN_KEY, null) ?: return emptyList()
         return withContext(Dispatchers.IO) {
             try {
-                val response = client.get("m1/warehouses") {
+                var response = client.get("m1/warehouses") {
                     header("Authorization", "Bearer $token")
                 }
-                val responseText = response.bodyAsText()
-                Log.d(TAG, "getWarehouses response: $responseText")
+                var responseText = response.bodyAsText()
+                Log.d(TAG, "getWarehouses (m1) response: $responseText")
 
                 if (response.status.isSuccess()) {
-                    val result = response.body<LaravelResponse<List<WarehouseItem>>>()
-                    result.data
-                } else {
-                    Log.e(TAG, "Failed to fetch warehouses: ${response.status}")
-                    emptyList()
+                    try {
+                        val result = response.body<LaravelResponse<List<WarehouseItem>>>()
+                        return@withContext result.data
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error deserializing m1/warehouses: ${e.message}")
+                    }
                 }
+
+                // Fallback a /api/warehouses
+                response = client.get("warehouses") {
+                    header("Authorization", "Bearer $token")
+                }
+                responseText = response.bodyAsText()
+                Log.d(TAG, "getWarehouses (fallback) response: $responseText")
+
+                if (response.status.isSuccess()) {
+                    try {
+                        val result = response.body<LaravelResponse<List<WarehouseItem>>>()
+                        return@withContext result.data
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error deserializing warehouses fallback: ${e.message}")
+                    }
+                }
+                emptyList()
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching warehouses: ${e.message}", e)
                 emptyList()

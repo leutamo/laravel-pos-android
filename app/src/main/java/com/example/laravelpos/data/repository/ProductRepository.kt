@@ -36,7 +36,7 @@ class ProductRepository @Inject constructor(
         return withContext(Dispatchers.IO) {
             if (token != null) {
                 try {
-                    val response = client.get("m1/products") {
+                    val response = client.get("products") {
                         header("Authorization", "Bearer $token")
                         // El backend usa page[size] para la cantidad de elementos
                         parameter("page[size]", "100")

@@ -118,11 +118,11 @@ class HomeViewModel @Inject constructor(
                     _activeWarehouse.value = current
                     warehouseRepository.saveSelectedWarehouse(current)
                 }
-                fetchProducts()
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading warehouses: ${e.message}")
             } finally {
                 _isLoadingWarehouses.value = false
+                fetchProducts()
             }
         }
     }
