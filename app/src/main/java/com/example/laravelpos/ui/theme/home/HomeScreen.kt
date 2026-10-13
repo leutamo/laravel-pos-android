@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.laravelpos.util.SoundEffects
 import com.example.laravelpos.viewmodel.HomeViewModel
 import com.example.laravelpos.viewmodel.LoginViewModel
 import kotlinx.coroutines.delay
@@ -587,11 +588,15 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .graphicsLayer { translationX = if (shakingProductId == product.id) shakeAnim else 0f }
+                                        .graphicsLayer {
+                                            translationX = if (shakingProductId == product.id) shakeAnim else 0f
+                                            alpha = if (isOutOfStock) 0.65f else 1.0f
+                                        }
                                         .clickable {
                                             val currentInCart = homeViewModel.getProductCount(product)
                                             if (isOutOfStock || currentInCart + 1.0 > stockVal) {
                                                 shakingProductId = product.id
+                                                SoundEffects.playBeepError()
                                                 scope.launch {
                                                     val msg = if (isOutOfStock) {
                                                         "Stock insuficiente: '${product.attributes.name}' no tiene existencias disponibles."
@@ -601,14 +606,12 @@ fun HomeScreen(navController: NavController, homeViewModel: HomeViewModel) {
                                                     snackbarHostState.showSnackbar(msg)
                                                 }
                                             } else {
+                                                SoundEffects.playBeepSuccess()
                                                 homeViewModel.addItemToCart(product)
                                             }
                                         },
                                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                                    colors = if (isOutOfStock)
-                                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                    else
-                                        CardDefaults.cardColors()
+                                    colors = CardDefaults.cardColors()
                                 ) {
                                     Column(
                                         modifier = Modifier
